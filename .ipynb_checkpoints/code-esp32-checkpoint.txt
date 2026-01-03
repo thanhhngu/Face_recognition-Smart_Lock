@@ -1,0 +1,45 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include "esp_camera.h"
+
+const char* ssid = "YOUR_WIFI";
+const char* password = "YOUR_PASS";
+const char* serverUrl = "http://<SERVER_IP>:5000/upload";
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("WiFi connected");
+  
+  // init camera ở đây (theo ví dụ CameraWebServer)
+}
+
+void loop() {
+  camera_fb_t * fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+
+  HTTPClient http;
+  http.begin(serverUrl);
+  http.addHeader("Content-Type", "image/jpeg");
+  int httpResponseCode = http.POST(fb->buf, fb->len);
+
+  if (httpResponseCode > 0) {
+    String payload = http.getString();
+    Serial.println("Server response: " + payload);
+    // TODO: parse JSON để lấy tên người
+  } else {
+    Serial.println("Error sending POST");
+  }
+
+  http.end();
+  esp_camera_fb_return(fb);
+
+  delay(5000); // chụp mỗi 5 giây
+}
