@@ -3,7 +3,7 @@ import os
 import time
 import face_recognition
 import numpy as np
-from db import user_exists, get_or_create_user, insert_encodings
+from src.db import user_exists, get_or_create_user, insert_encodings
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")

@@ -1,3 +1,4 @@
+CREATE DATABASE IF NOT EXISTS smart_lock;
 USE smart_lock;
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,

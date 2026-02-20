@@ -4,7 +4,7 @@ import numpy as np
 import requests
 import json
 from collections import defaultdict
-from db import (
+from src.db import (
     fetch_all_encodings_with_names,
     get_or_create_user,
     insert_encodings,
@@ -127,21 +127,5 @@ class FaceRecognizer:
             self.pending_updates.clear()
 
         return {"detections": detections, "decision": decision}
-
-
-# recognizer = FaceRecognizer("encodings.pkl")
-# image, results = recognizer.recognize("C:/Users/ADMIN/OneDrive/Desktop/z7415063940931_4992fc5ac76a26366f13513541be3f49.jpg")
-# cv2.namedWindow("Face Recognition", cv2.WINDOW_NORMAL)
-# cv2.imshow("Face Recognition", image)
-# cv2.resizeWindow("Face Recognition", 800, 600)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
-# for loc, name in results:
-#     print("Location:", loc, "=>", name)
-
-
-# In[ ]:
-
-
 
 

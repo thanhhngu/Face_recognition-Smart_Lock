@@ -84,3 +84,34 @@ def fetch_all_encodings_with_names() -> Tuple[List[List[float]], List[str]]:
 def user_exists(name):
     cursor.execute("SELECT id FROM users WHERE name=%s", (name,))
     return cursor.fetchone() is not None
+'''
+def init_db():
+    # Tạo database nếu chưa có
+    cursor.execute("CREATE DATABASE IF NOT EXISTS smart_lock")
+    cursor.execute("USE smart_lock")
+
+    # Tạo bảng users
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        role VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Tạo bảng face_encodings
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS face_encodings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        encoding JSON NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    conn.commit()
+
+# Gọi init_db khi khởi động
+init_db()
+'''

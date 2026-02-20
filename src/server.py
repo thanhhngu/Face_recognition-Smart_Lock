@@ -4,8 +4,8 @@ from typing import Optional
 import uvicorn
 import threading
 
-from core import FaceRecognizer
-import train
+from src.core import FaceRecognizer
+from src import train
 
 app = FastAPI()
 recognizer = None
@@ -13,7 +13,6 @@ recognizer = None
 
 class TrainRequest(BaseModel):
     data_dir: Optional[str] = "data"
-    # encodings are stored in MySQL; this option is kept for compatibility
     encodings_file: Optional[str] = None
     label: Optional[str] = "user"
     camera_url: str 
@@ -70,7 +69,7 @@ def api_recognize(req: RecognizeRequest):
     if recognizer is None:
         recognizer = FaceRecognizer()
 
-    # convert camera_url to int if it's a digit (for local webcam)
+    # convert camera_url to int if it's a digit(webcam)
     cam = req.camera_url
     try:
         if isinstance(cam, str) and cam.isdigit():
