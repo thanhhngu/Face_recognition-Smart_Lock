@@ -1,0 +1,338 @@
+:root {
+    --primary-color: #4a90e2;
+    --primary-dark: #2e5c8a;
+    --danger-color: #e74c3c;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --bg-color: #f5f7fa;
+    --card-bg: #ffffff;
+    --text-primary: #2c3e50;
+    --text-secondary: #7f8c8d;
+    --border-color: #e0e6ed;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.container header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.camera-space {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+}
+
+#camera-preview {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 15px;
+    width: 640px;
+    height: 480px;
+    background-color: #333;
+    border-radius: 8px;
+}
+
+.camera-space button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+#camera-info {
+    margin-top: 4px;
+    text-align: center;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--border-color);
+    background: var(--card-bg);
+    padding: 0 20px;
+    border-radius: 12px 12px 0 0;
+    box-shadow: var(--shadow);
+}
+
+.nav-btn {
+    padding: 15px 30px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1em;
+    color: var(--text-secondary);
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+.nav-btn:hover {
+    color: var(--primary-color);
+}
+
+.nav-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}   
+/* Tab Content */
+.tab-content {
+    background: var(--card-bg);
+    border-radius: 0 0 12px 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.tab-pane {
+    display: none;
+    padding: 40px;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.section-card {
+    background: var(--card-bg);
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95em;
+    transition: all 0.3s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 5px;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+
+/* Status Box */
+/*
+.status-box {
+    background: #e8f5e9;
+    border-left: 4px solid var(--success-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    font-weight: 500;
+}
+
+.status-box.error {
+    background: #ffebee;
+    border-left-color: var(--danger-color);
+}
+
+.status-box.warning {
+    background: #fff3e0;
+    border-left-color: var(--warning-color);
+}
+*/
+
+/* Video Preview */
+/* .video-preview {
+    position: relative;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 640px;
+}
+
+.video-preview video {
+    width: 100%;
+    height: auto;
+    display: block;
+} */
+
+/* Capture Counter */
+/* .capture-counter {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1.1em;
+} */
+
+/* Results Box */
+/* .results-box {
+    background: #f5f7fa;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 25px;
+    margin: 20px 0;
+} */
+
+/* .results-box h3 {
+    margin-bottom: 15px;
+}
+
+#results-content {
+    display: grid;
+    gap: 15px;
+}
+
+.result-item {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.result-item.unlock {
+    border-left-color: var(--success-color);
+    background: #f0f8ff;
+}
+
+.result-item-info {
+    flex: 1;
+}
+
+.result-item-name {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+}
+
+.result-item-similarity {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.result-item-badge {
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.badge-unlock {
+    background: var(--success-color);
+    color: white;
+}
+
+.badge-unknown {
+    background: #f0f0f0;
+    color: var(--text-secondary);
+} */
+
+/* Buttons */
+/* .btn-primary,
+.btn-danger {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95em;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+} */
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #camera-preview {
+        width: 100%;
+        max-width: 500px;
+        height: 375px;
+    }
+
+    .video-preview {
+        max-width: 100%;
+    }
+
+    .tab-pane {
+        padding: 20px;
+    }
+
+    .button-group {
+        flex-direction: column;
+    }
+
+    .button-group button {
+        width: 100%;
+    }
+}

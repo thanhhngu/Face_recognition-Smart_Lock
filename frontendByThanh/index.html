@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition System</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Face Recognition System</h1>
+        </header>
+        <!-- <div class="camera-space">
+            <div id="camera-preview">
+                <video id="preview-video" autoplay playsinline></video>
+            </div>
+            <button id="start-preview">Start Preview</button>
+            <button id="stop-preview">Stop Preview</button>
+            <div id="camera-info">
+                <p>No camera selected yet</p>
+            </div>
+        </div> -->
+        <nav class="nav-tabs">
+            <button class="nav-btn active" data-tab="train">Train</button>
+            <button class="nav-btn" data-tab="recognize">Recognize</button>
+        </nav>
+        <main class="tab-content">
+            <section id="train" class="tab-pane active">
+                <div class="section-card">
+                    <div class="form-group">
+                        <label for="train-name">Person's Name:</label>
+                        <input type="text" id="train-name" placeholder="Enter person's name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="target-frames">Number of frames to capture:</label>
+                        <input type="number" id="target-frames" value="50" min="10" max="200">
+                        <small>Recommended: 50 frames for good accuracy</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="capture-delay">Delay between captures (seconds):</label>
+                        <input type="number" id="capture-delay" value="6" min="1" max="30" step="0.1">
+                    </div>
+
+                    <!-- <div id="train-video-preview" class="video-preview" style="display: none;">
+                        <video id="train-video" autoplay playsinline></video>
+                        <div class="capture-counter">
+                            <span id="frame-count">0</span> / <span id="target-count">50</span> frames
+                        </div>
+                    </div> -->
+
+                    <!-- <div id="train-status" class="status-box" style="display: none;"></div> -->
+
+                    <div class="button-group">
+                        <button class="btn-primary" id="start-training">Start Training</button>
+                        <button class="btn-danger" id="stop-training" style="display: none;">Stop Training</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="recognize" class="tab-pane">
+                <div class="section-card">
+                    <div class="form-group">
+                        <label for="similarity-threshold">Similarity Threshold (%):</label>
+                        <input type="number" id="similarity-threshold" value="70" min="50" max="100">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-frames">Max frames to process:</label>
+                        <input type="number" id="max-frames" value="30" min="5" max="100">
+                    </div>
+
+                    <!-- <div id="recognize-video-preview" class="video-preview" style="display: none;">
+                        <video id="recognize-video" autoplay playsinline></video>
+                    </div> -->
+
+                    <!-- <div id="recognize-status" class="status-box" style="display: none;"></div> -->
+
+                    <!-- <div id="recognition-results" class="results-box" style="display: none;">
+                        <h3>Recognition Results</h3>
+                        <div id="results-content"></div>
+                    </div> -->
+
+                    <div class="button-group">
+                        <button class="btn-primary" id="start-recognition">Start Recognition</button>
+                        <!-- <button class="btn-danger" id="stop-recognition" style="display: none;">Stop Recognition</button> -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,9 +1,12 @@
 import cv2
 import os
+import asyncio
 import time
 import face_recognition
 import numpy as np
 from src.db import user_exists, get_or_create_user, insert_encodings
+from fastapi import WebSocket
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -55,6 +58,7 @@ def create_encodings_db_by_cam_url(data_dir=None, camera_url = 0, label = "user"
 
     cap.release()
     cv2.destroyAllWindows()
+    create_encodings_db(data_dir)
 
 def create_encodings_db(data_dir=None):
     inserted = 0
@@ -96,6 +100,44 @@ def create_encodings_db(data_dir=None):
 
     print(f"Inserted {inserted} encodings into database.")
     return inserted
+
+async def train_from_websocket(websocket: WebSocket, label: str, target_frames: int = 50, delay: int = 6):
+    await websocket.accept()
+    user_id = get_or_create_user(label)
+    count = 0
+    batch = []
+    delay = delay/target_frames
+
+    while count < target_frames:
+        try: 
+            data = await websocket.receive_bytes()
+            nparr = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if frame is None:
+                continue
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            encodings = face_recognition.face_encodings(rgb_frame)
+            if not encodings:
+                continue
+            for enc in encodings:
+                batch.append(enc.tolist())
+                count += 1
+                
+            await asyncio.sleep(delay)
+            if count >= target_frames:
+                break
+        except Exception as e:
+            print("Error processing frame:", e)
+            break
+
+    if batch:
+        insert_encodings(user_id, batch)
+        print(f"Inserted {len(batch)} encodings for user {label}")
+    else:
+        print(f"No encodings created for user {label}")
+
+    await websocket.close()
+
 
 
 if __name__ == "__main__":

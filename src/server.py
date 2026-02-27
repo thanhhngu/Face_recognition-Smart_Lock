@@ -1,14 +1,32 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
 import threading
+import json
 
 from src.core import FaceRecognizer
 from src import train
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
 app = FastAPI()
 recognizer = None
+
+origins = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,   # hoặc ["*"] để cho phép tất cả
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class TrainRequest(BaseModel):
@@ -61,6 +79,19 @@ def api_train_by_cam(req: TrainRequest):
         "label": req.label,
         "target_frames": req.target_frames
     }
+
+@app.websocket("/ws/train")
+async def ws_train(websocket: WebSocket):
+    await websocket.accept()
+    config = await websocket.receive_text()
+    cfg = json.loads(config)
+
+    label = cfg.get("label", "user")
+    target_frames = int(cfg.get("target_frames", 50))
+    delay = int(cfg.get("delay", 6))
+
+    await train.train_from_websocket(websocket, label=label, target_frames=target_frames, delay=delay)
+
 
 
 @app.post("/recognize")
