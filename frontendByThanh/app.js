@@ -1,4 +1,4 @@
-var API_URL = 'http://localhost:8000';
+var API_URL = '/api';
 
 // State management
 const state = {

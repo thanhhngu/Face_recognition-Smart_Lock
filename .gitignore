@@ -1,8 +1,7 @@
 src/__pycache__/
 data/
 configs/
-.env
+
 .vs/
-nginx/
-docker/
+
 frontend/

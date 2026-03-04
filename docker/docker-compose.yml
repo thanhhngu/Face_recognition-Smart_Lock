@@ -1,0 +1,43 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: smart_lock_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: smart_lock
+    ports:
+      - "3307:3306"
+    expose:
+      - "3306"
+
+  app:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: smart_lock_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASS: 123456
+      DB_NAME: smart_lock
+
+    depends_on:
+      - db
+    expose:
+      - "8000"
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ../frontendByThanh:/usr/share/nginx/html
+      - ../nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app

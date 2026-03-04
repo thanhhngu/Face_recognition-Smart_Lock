@@ -15,11 +15,11 @@ app = FastAPI()
 recognizer = None
 
 origins = [
+    "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:5500",
     "http://127.0.0.1:5500"
-
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,   # hoặc ["*"] để cho phép tất cả
@@ -36,8 +36,6 @@ class TrainRequest(BaseModel):
     camera_url: str 
     target_frames: Optional[int] = 50
     delay: Optional[int] = 6
-
-
 
 class RecognizeRequest(BaseModel):
     camera_url: str
