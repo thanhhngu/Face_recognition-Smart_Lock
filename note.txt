@@ -1,0 +1,2 @@
+upgrade websocket 
+pip install "uvicorn[standard]" --upgrade

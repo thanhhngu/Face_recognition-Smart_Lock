@@ -1,4 +1,6 @@
-var API_URL = '/api';
+var API_URL = 'http://localhost:8000';
+var WS_URL = 'localhost';
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 
 // State management
 const state = {
@@ -11,7 +13,7 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
     initializeEventListeners();
     checkBackendConnection();
-    //initializeCameraPreview();
+    initializeCameraPreview();
 });
 
 function initializeEventListeners() {
@@ -58,118 +60,130 @@ async function checkBackendConnection() {
     }
 }
 
-// function initializeCameraPreview() {
-//     const startBtn = document.getElementById("start-preview");
-//     const stopBtn = document.getElementById("stop-preview");
-//     const videoElement = document.getElementById("preview-video");
-//     const cameraInfo = document.getElementById("camera-info");
+function initializeCameraPreview() {
+    const startBtn = document.getElementById("start-preview");
+    const stopBtn = document.getElementById("stop-preview");
+    const videoElement = document.getElementById("preview-video");
+    const cameraInfo = document.getElementById("camera-info");
 
-//     let stream = null;
+    let stream = null;
 
-//     // Start preview
-//     startBtn.addEventListener("click", async () => {
-//         try {
-//             stream = await navigator.mediaDevices.getUserMedia({ video: true });
-//             videoElement.srcObject = stream;
-//             cameraInfo.innerHTML = "<p>Camera is active</p>";
-//         } catch (error) {
-//             console.error("Cannot access camera:", error);
-//             cameraInfo.innerHTML = "<p>Camera access denied or not available</p>";
-//         }
-//     });
-
-//     // Stop preview
-//     stopBtn.addEventListener("click", () => {
-//         if (stream) {
-//             stream.getTracks().forEach(track => track.stop());
-//             videoElement.srcObject = null;
-//             cameraInfo.innerHTML = "<p>Camera stopped</p>";
-//         }
-//     });
-// }
-
-async function startTraining() {
-    const label = document.getElementById('train-name').value.trim();
-    const targetFrames = parseInt(document.getElementById('target-frames').value);
-    const delay = parseFloat(document.getElementById('capture-delay').value);
-
-    if (!label) {
-        console.log('Name is required for training.');
-        return;
-    }
-
-    //state.isTraining = true;
-
-    try {
-
-        const response = await fetch(API_URL + '/train_by_cam_url', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                label: label,
-                target_frames: targetFrames,
-                delay: delay,
-                camera_url: state.selectedCamera,
-                data_dir: 'data'
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            console.log('Training completed successfully:', data);
-        } else {
-            console.error('Training failed:', data);
+    // Start preview
+    startBtn.addEventListener("click", async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            videoElement.srcObject = stream;
+            cameraInfo.innerHTML = "<p>Camera is active</p>";
+        } catch (error) {
+            console.error("Cannot access camera:", error);
+            cameraInfo.innerHTML = "<p>Camera access denied or not available</p>";
         }
-    } catch (error) {
-        console.error('Error starting training:', error);
-       
-    }
+    });
+
+    // Stop preview
+    stopBtn.addEventListener("click", () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            videoElement.srcObject = null;
+            cameraInfo.innerHTML = "<p>Camera stopped</p>";
+        }
+    });
 }
 
+async function startTraining() {
+    const label = document.getElementById("train-name").value.trim();
+    const targetFrames = parseInt(document.getElementById("target-frames").value);
+    const delay = parseFloat(document.getElementById("capture-delay").value);
+    const videoElement = document.getElementById("preview-video");
+    const cameraInfo = document.getElementById("camera-info");
+    if (!label) {
+        alert("Please enter a name for training.");
+        return;
+    }
+    const ws = new WebSocket(`${protocol}://${WS_URL}/ws/train`);
+
+    ws.onopen = async () => {
+        ws.send(JSON.stringify({
+            label: label,
+            target_frames: targetFrames,
+            delay: delay
+        }));
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            videoElement.srcObject = stream;
+            videoElement.play();
+
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            intervalId = setInterval(() => {
+                if (!videoElement.videoWidth) return;
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                ctx.drawImage(videoElement, 0, 0);
+
+                canvas.toBlob(blob => {
+                    if (blob && ws.readyState === WebSocket.OPEN) {
+                        blob.arrayBuffer().then(buffer => {
+                            ws.send(buffer);
+                            console.log('Sent frame to server for training');
+                        });
+                    }
+                }, "image/jpeg", 0.8);
+            }, 200);
+
+            cameraInfo.innerHTML = "<p>Camera is active</p>";
+        } catch (error) {
+            console.error("Cannot access camera:", error);
+            cameraInfo.innerHTML = "<p>Camera access denied or not available</p>";
+        }
+    };
+}
 
 async function startRecognition() {
+    const videoElement = document.getElementById("preview-video");
+    const cameraInfo = document.getElementById("camera-info");
     const threshold = parseInt(document.getElementById('similarity-threshold').value);
     const maxFrames = parseInt(document.getElementById('max-frames').value);
 
-    if (threshold < 50 || threshold > 100) {
-        console.log('Similarity threshold must be between 50 and 100.');
-        return;
-    }
+    const ws = new WebSocket(`${protocol}://${WS_URL}/ws/recognize`);
+    ws.onopen = async () => {
+        ws.send(JSON.stringify({
+            max_frames: maxFrames,
+            similarity_threshold: threshold
+        }));
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            videoElement.srcObject = stream;
+            videoElement.play();
 
-    if (maxFrames < 5 || maxFrames > 100) {
-        console.log('Max frames must be between 5 and 100.');
-        return;
-    }
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
 
-    //state.isRecognizing = true;
+            intervalId = setInterval(() => {
+                if (!videoElement.videoWidth) return;
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                ctx.drawImage(videoElement, 0, 0);
 
-    try {
+                canvas.toBlob(blob => {
+                    if (blob && ws.readyState === WebSocket.OPEN) {
+                        blob.arrayBuffer().then(buffer => {
+                            ws.send(buffer);
+                            console.log('Sent frame to server for recognition');
+                        });
+                    }
+                }, "image/jpeg", 0.8);
+            }, 1000);
 
-        const response = await fetch(API_URL + '/recognize', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                frame_skip: 3,
-                similarity_threshold: threshold,
-                max_frames: maxFrames,
-                camera_url: state.selectedCamera
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            console.log('Recognition completed successfully:', data);
-        } else {
-            console.error('Recognition failed:', data);
+            cameraInfo.innerHTML = "<p>Camera is active</p>";
+        } catch (error) {
+            console.error("Cannot access camera:", error);
+            cameraInfo.innerHTML = "<p>Camera access denied or not available</p>";
         }
-    } catch (error) {
-        console.error('Error starting recognition:', error);
-        // showRecognizeStatus(`Error: ${error.message}`, 'error');
-    }
+        ws.onmessage = (event) => {
+            console.log("Server:", event.data);
+        };
+
+    };
 }

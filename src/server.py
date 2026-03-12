@@ -90,15 +90,36 @@ async def ws_train(websocket: WebSocket):
 
     await train.train_from_websocket(websocket, label=label, target_frames=target_frames, delay=delay)
 
+#test websocket 
+@app.websocket("/ws/test")
+async def ws_test(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        cfg = json.loads(data)
+        print("Received:", cfg)
+        await websocket.send_text(f"Echo: {cfg}")
 
+@app.websocket("/ws/recognize")
+async def ws_recognize(websocket: WebSocket):
+    global recognizer
+    await websocket.accept()
+    if recognizer is None:
+        recognizer = FaceRecognizer()
+    config = await websocket.receive_text()
+    cfg = json.loads(config)
+    
+    max_frames = int(cfg.get("max_frames", 30))
+    similarity_threshold = int(cfg.get("similarity_threshold", 70))
+    
+
+    await recognizer.recognize_with_websocket(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
 
 @app.post("/recognize")
 def api_recognize(req: RecognizeRequest):
     global recognizer
     if recognizer is None:
         recognizer = FaceRecognizer()
-
-    # convert camera_url to int if it's a digit(webcam)
     cam = req.camera_url
     try:
         if isinstance(cam, str) and cam.isdigit():
@@ -112,7 +133,6 @@ def api_recognize(req: RecognizeRequest):
         frame_skip=req.frame_skip,
         similarity_threshold=req.similarity_threshold,
     )
-    # decision: return minimal JSON so ESP32 can decide to unlock
     decision = result.get("decision", {})
     return {"decision": decision, "detections": result.get("detections", [])}
 

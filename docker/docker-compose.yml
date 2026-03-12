@@ -7,7 +7,7 @@ services:
       MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: smart_lock
     ports:
-      - "3308:3306"
+      - "3307:3306"
     expose:
       - "3306"
 

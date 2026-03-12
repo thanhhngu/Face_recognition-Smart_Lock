@@ -1,7 +1,8 @@
 src/__pycache__/
 data/
 configs/
-
+node_modules/
 .vs/
-
+package*.json
+frontendByThanh/tmp.js
 frontend/

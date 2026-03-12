@@ -102,7 +102,6 @@ def create_encodings_db(data_dir=None):
     return inserted
 
 async def train_from_websocket(websocket: WebSocket, label: str, target_frames: int = 50, delay: int = 6):
-    await websocket.accept()
     user_id = get_or_create_user(label)
     count = 0
     batch = []

@@ -2,6 +2,7 @@ import face_recognition
 import cv2
 import numpy as np
 import requests
+from fastapi import WebSocket
 import json
 from collections import defaultdict
 from src.db import (
@@ -128,4 +129,35 @@ class FaceRecognizer:
 
         return {"detections": detections, "decision": decision}
 
+    async def recognize_with_websocket(self, websocket: WebSocket, max_frames=30, frame_skip=3, similarity_threshold=70):
+        frame_count = 0
+        processed = 0
 
+        while processed < max_frames:
+            frame_count += 1
+            if frame_count % frame_skip != 0:
+                continue
+            processed += 1
+
+            try:
+                data = await websocket.receive_bytes()
+                nparr = np.frombuffer(data, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                results = self.recognize_frame(frame, similarity_threshold=similarity_threshold)
+                await websocket.send_json({"type": "detection", "results": results})
+                for r in results:
+                    if r["unlock"]:
+                        # flush pending updates and send unlock decision
+                        if self.pending_updates:
+                            grouped = defaultdict(list)
+                            for name, vec in self.pending_updates:
+                                grouped[name].append(vec)
+                            for name, vectors in grouped.items():
+                                self.update_encodings(name, vectors)
+                            self.pending_updates.clear()
+                        await websocket.send_json({"type": "decision", "decision": {"unlock": True, "user": r["name"], "similarity": r["similarity"]}})
+                        return
+            except Exception as e:
+                print("error processing frame from websocket:", e)
+                continue  
