@@ -26,6 +26,7 @@
         <nav class="nav-tabs">
             <button class="nav-btn active" data-tab="train">Train</button>
             <button class="nav-btn" data-tab="recognize">Recognize</button>
+            <button class="nav-btn" data-tab="info">Info</button>
         </nav>
         <main class="tab-content">
             <section id="train" class="tab-pane active">
@@ -88,6 +89,20 @@
                     <div class="button-group">
                         <button class="btn-primary" id="start-recognition">Start Recognition</button>
                         <!-- <button class="btn-danger" id="stop-recognition" style="display: none;">Stop Recognition</button> -->
+                    </div>
+                </div>
+            </section>
+            <section id="info" class="tab-pane">
+                <div class="section-card">
+                    <div class="from-group">
+                        <label for="user-name">Person's Name:</label>
+                        <input type="text" id="user-name" placeholder="Enter person's name" required>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn-primary" id="get-logs">Get Logs</button>
+                    </div>
+                    <div id="root-logs">
+
                     </div>
                 </div>
             </section>

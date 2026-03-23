@@ -4,6 +4,7 @@ from typing import Optional
 import uvicorn
 import threading
 import json
+from src.core import fetch_access_logs_for_user
 
 from src.core import FaceRecognizer
 from src import train
@@ -99,6 +100,19 @@ async def ws_test(websocket: WebSocket):
         cfg = json.loads(data)
         print("Received:", cfg)
         await websocket.send_text(f"Echo: {cfg}")
+        
+@app.websocket("/ws/logs")
+async def ws_show_logs(websocket: WebSocket):
+    await websocket.accept()
+    config = await websocket.receive_text()
+    cfg = json.loads(config)
+    un = cfg.get("user_name", "").strip()
+    if un:
+        logs = fetch_access_logs_for_user(un)
+        await websocket.send_json({"logs": logs})
+    else:
+        logs = fetch_access_logs_for_user("")
+        await websocket.send_json({"logs": logs})
 
 @app.websocket("/ws/recognize")
 async def ws_recognize(websocket: WebSocket):
@@ -111,7 +125,6 @@ async def ws_recognize(websocket: WebSocket):
     
     max_frames = int(cfg.get("max_frames", 30))
     similarity_threshold = int(cfg.get("similarity_threshold", 70))
-    
 
     await recognizer.recognize_with_websocket(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
 

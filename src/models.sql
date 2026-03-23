@@ -14,3 +14,11 @@ CREATE TABLE face_encodings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE TABLE access_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    access_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    success BOOLEAN,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);

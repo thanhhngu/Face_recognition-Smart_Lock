@@ -19,7 +19,6 @@ conn = mysql.connector.connect(
 )
 cursor = conn.cursor()
 
-
 def get_or_create_user(name: str) -> int:
     """Return user id for `name`, creating a user row if needed."""
     cursor.execute("SELECT id FROM users WHERE name = %s", (name,))
@@ -30,6 +29,11 @@ def get_or_create_user(name: str) -> int:
     conn.commit()
     return cursor.lastrowid
 
+def get_user_id(name: str) -> int:
+    """Return user id for `name`, or None if not found."""
+    cursor.execute("SELECT id FROM users WHERE name = %s", (name,))
+    row = cursor.fetchone()
+    return row[0] if row else None
 
 def insert_encodings(user_id: int, encodings: List[List[float]]):
     """Insert one or more encodings (list of float lists) for `user_id`.
@@ -84,6 +88,22 @@ def fetch_all_encodings_with_names() -> Tuple[List[List[float]], List[str]]:
 def user_exists(name):
     cursor.execute("SELECT id FROM users WHERE name=%s", (name,))
     return cursor.fetchone() is not None
+
+def log_access_attempt(user_id: int, success: bool):
+    cursor.execute("INSERT INTO access_logs (user_id, success) VALUES (%s, %s)", (user_id, success))
+    conn.commit()
+    
+def fetch_access_logs() -> List[Tuple[str, str, bool]]:
+    """Return list of (user_name, access_time, success) tuples for access logs."""
+    sql = """
+    SELECT u.name, al.access_time, al.success 
+    FROM access_logs al 
+    LEFT JOIN users u ON al.user_id = u.id 
+    ORDER BY al.access_time DESC
+    """
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    return [(row[0] if row[0] else "Unknown", row[1].strftime("%Y-%m-%d %H:%M:%S"), bool(row[2])) for row in rows]
 '''
 def init_db():
     # Tạo database nếu chưa có

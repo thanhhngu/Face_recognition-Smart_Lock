@@ -7,11 +7,25 @@ import json
 from collections import defaultdict
 from src.db import (
     fetch_all_encodings_with_names,
+    get_user_id,
     get_or_create_user,
     insert_encodings,
     count_encodings_for_user,
     delete_oldest_encodings,
+    log_access_attempt,
+    fetch_access_logs
 )
+
+def fetch_access_logs_for_user(un: str):
+    logs = fetch_access_logs()
+    user_logs = defaultdict(list)
+    for user_name, access_time, success in logs:
+        user_logs[user_name].append((access_time, success))
+    if not un:
+        return user_logs
+    else:
+        return user_logs.get(un, [])
+
 
 class FaceRecognizer:
     def __init__(self, encodings_file=None, max_count_per_user=50):
@@ -156,8 +170,21 @@ class FaceRecognizer:
                             for name, vectors in grouped.items():
                                 self.update_encodings(name, vectors)
                             self.pending_updates.clear()
+                        # user_id = get_user_id(r["name"])
+                        # if user_id is not None:
+                        #     log_access_attempt(user_id=user_id, success=True)
+                        # else:
+                        #     print(f"User {r['name']} not found in database")
+                        log_access_attempt(user_id=get_user_id(r["name"]), success=True)
                         await websocket.send_json({"type": "decision", "decision": {"unlock": True, "user": r["name"], "similarity": r["similarity"]}})
+                        
                         return
             except Exception as e:
                 print("error processing frame from websocket:", e)
                 continue  
+        await websocket.close()
+        
+
+
+
+    

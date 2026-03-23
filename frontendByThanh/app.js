@@ -1,14 +1,6 @@
 var API_URL = 'http://localhost:8000';
-var WS_URL = 'localhost';
+var WS_URL = 'localhost:8000';
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-
-// State management
-const state = {
-    selectedCamera: "0",
-    stream: null,
-    isTraining: false,
-    isRecognizing: false
-};
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeEventListeners();
@@ -29,6 +21,9 @@ function initializeEventListeners() {
 
     // Recognition controls
     document.getElementById('start-recognition').addEventListener('click', startRecognition);
+
+    // Access logs    
+    document.getElementById('get-logs').addEventListener('click', fetchAccessLogs);
 }
 
 function switchTab(tabName) {
@@ -186,4 +181,44 @@ async function startRecognition() {
         };
 
     };
+}
+
+async function fetchAccessLogs() {
+    const rootLogContainer = document.getElementById("root-logs");
+    const userName = document.getElementById("user-name").value.trim();
+
+    const ws = new WebSocket(`${protocol}://${WS_URL}/ws/logs`);
+    ws.onopen = async () => {
+        ws.send(JSON.stringify({ user_name: userName }));
+    };
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log("Received logs:", data);
+            if (userName) {
+                data.logs.forEach(item => {
+                    const [time, status] = item;
+                    rootLogContainer.innerHTML += `
+                        <p>${time} - ${status}</p>
+                    `
+                });
+            } else {
+                Object.entries(data.logs).forEach(([key, value]) => {
+                    rootLogContainer.innerHTML += `
+                        <p>${key}</p>
+                    `;
+                    value.forEach(item => {
+                        const [time, status] = item;
+                        rootLogContainer.innerHTML += `
+                            <p style="margin-left: 20px;">${time} - ${status}</p>
+                        `;
+                    });
+                });
+            }
+
+
+        } catch (error) {
+            console.error("Error parsing logs:", error);
+        }
+    }
 }
