@@ -1,7 +1,12 @@
+import InnerHTML from "./mdls/innerHTML.js";
+import WSSendFrame from "./mdls/WSSendFrame.js";
+
 var API_URL = 'http://localhost:8000';
 var WS_URL = 'localhost:8000';
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-
+var stream = null; 
+var intervalId = null;
+const stopBtn = document.getElementById("stop-preview"); 
 document.addEventListener('DOMContentLoaded', () => {
     initializeEventListeners();
     checkBackendConnection();
@@ -57,11 +62,9 @@ async function checkBackendConnection() {
 
 function initializeCameraPreview() {
     const startBtn = document.getElementById("start-preview");
-    const stopBtn = document.getElementById("stop-preview");
+    //const stopBtn = document.getElementById("stop-preview");
     const videoElement = document.getElementById("preview-video");
     const cameraInfo = document.getElementById("camera-info");
-
-    let stream = null;
 
     // Start preview
     startBtn.addEventListener("click", async () => {
@@ -108,30 +111,18 @@ async function startTraining() {
             videoElement.srcObject = stream;
             videoElement.play();
 
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-
-            intervalId = setInterval(() => {
-                if (!videoElement.videoWidth) return;
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                ctx.drawImage(videoElement, 0, 0);
-
-                canvas.toBlob(blob => {
-                    if (blob && ws.readyState === WebSocket.OPEN) {
-                        blob.arrayBuffer().then(buffer => {
-                            ws.send(buffer);
-                            console.log('Sent frame to server for training');
-                        });
-                    }
-                }, "image/jpeg", 0.8);
-            }, 200);
+            intervalId = WSSendFrame(ws, videoElement, 1.0, 500);
 
             cameraInfo.innerHTML = "<p>Camera is active</p>";
         } catch (error) {
             console.error("Cannot access camera:", error);
             cameraInfo.innerHTML = "<p>Camera access denied or not available</p>";
         }
+        ws.onclose = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
     };
 }
 
@@ -152,24 +143,7 @@ async function startRecognition() {
             videoElement.srcObject = stream;
             videoElement.play();
 
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-
-            intervalId = setInterval(() => {
-                if (!videoElement.videoWidth) return;
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                ctx.drawImage(videoElement, 0, 0);
-
-                canvas.toBlob(blob => {
-                    if (blob && ws.readyState === WebSocket.OPEN) {
-                        blob.arrayBuffer().then(buffer => {
-                            ws.send(buffer);
-                            console.log('Sent frame to server for recognition');
-                        });
-                    }
-                }, "image/jpeg", 0.8);
-            }, 1000);
+            intervalId = WSSendFrame(ws, videoElement, 1.0, 500);
 
             cameraInfo.innerHTML = "<p>Camera is active</p>";
         } catch (error) {
@@ -178,6 +152,11 @@ async function startRecognition() {
         }
         ws.onmessage = (event) => {
             console.log("Server:", event.data);
+        };
+        ws.onclose = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
         };
 
     };
@@ -194,29 +173,7 @@ async function fetchAccessLogs() {
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-            console.log("Received logs:", data);
-            if (userName) {
-                data.logs.forEach(item => {
-                    const [time, status] = item;
-                    rootLogContainer.innerHTML += `
-                        <p>${time} - ${status}</p>
-                    `
-                });
-            } else {
-                Object.entries(data.logs).forEach(([key, value]) => {
-                    rootLogContainer.innerHTML += `
-                        <p>${key}</p>
-                    `;
-                    value.forEach(item => {
-                        const [time, status] = item;
-                        rootLogContainer.innerHTML += `
-                            <p style="margin-left: 20px;">${time} - ${status}</p>
-                        `;
-                    });
-                });
-            }
-
-
+            InnerHTML(rootLogContainer, data.logs, userName);
         } catch (error) {
             console.error("Error parsing logs:", error);
         }
