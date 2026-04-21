@@ -1,9 +1,21 @@
-import face_recognition
+import asyncio
 import cv2
 import numpy as np
-import requests
 from fastapi import WebSocket
-import json
+from deepface import DeepFace
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=1)
+
+
+
+def cosine_distance(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    return 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+
 from collections import defaultdict
 from src.db import (
     fetch_all_encodings_with_names,
@@ -15,6 +27,8 @@ from src.db import (
     log_access_attempt,
     fetch_access_logs
 )
+
+ARC_FACE_THRESHOLD = 0.68
 
 def fetch_access_logs_for_user(un: str):
     logs = fetch_access_logs()
@@ -41,6 +55,7 @@ class FaceRecognizer:
             encs, names = fetch_all_encodings_with_names()
             self.known_encodings = encs
             self.known_names = names
+            print(f"Loaded {len(self.known_encodings)} known encodings from DB.")   
         except Exception as e:
             print("warning: failed to load encodings from DB:", e)
             self.known_encodings = []
@@ -66,32 +81,46 @@ class FaceRecognizer:
             print("error updating encodings in DB:", e)
 
     def recognize_frame(self, image, similarity_threshold=70):
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(image_rgb)
-        face_encodings = face_recognition.face_encodings(image_rgb, face_locations)
+        try:
+            embedding_objs = DeepFace.represent(
+                img_path=image,
+                model_name='ArcFace',
+                enforce_detection=False,
+                detector_backend='retinaface',
+                align=True
+            )
+        except Exception as e:
+            print(f"Error in DeepFace.represent: {e}")
+            return []
 
         results = []
-        for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-            matches = face_recognition.compare_faces(self.known_encodings, face_encoding)
-            face_distances = face_recognition.face_distance(self.known_encodings, face_encoding)
+        
+        distance_threshold = (100 - similarity_threshold) / 50 * ARC_FACE_THRESHOLD
+
+        for face_obj in embedding_objs:
+            face_encoding = face_obj['embedding']
+
+            if not self.known_encodings:
+                continue
+
+            distances = [cosine_distance(face_encoding, known_enc) for known_enc in self.known_encodings]
 
             name = "Unknown"
             similarity = 0.0
             unlock = False
-            if len(face_distances) > 0:
-                best_match_index = face_distances.argmin()
-                similarity = (1 - float(face_distances[best_match_index])) * 100
-                if matches[best_match_index]:
-                    name = self.known_names[best_match_index]
+            if distances:
+                best_match_index = np.argmin(distances)
+                best_distance = distances[best_match_index]
 
-                if similarity >= similarity_threshold and matches[best_match_index]:
+                similarity = max(0, 100 - (best_distance / ARC_FACE_THRESHOLD * 50))
+
+                if best_distance <= distance_threshold:
+                    name = self.known_names[best_match_index]
                     unlock = True
-                    # collect pending update vectors (kept small)
                     if len(self.pending_updates) < 3:
                         self.pending_updates.append((name, face_encoding))
 
             results.append({
-                "location": [int(top), int(right), int(bottom), int(left)],
                 "name": name,
                 "similarity": float(similarity),
                 "unlock": bool(unlock)
@@ -143,22 +172,29 @@ class FaceRecognizer:
 
         return {"detections": detections, "decision": decision}
 
-    async def recognize_with_websocket(self, websocket: WebSocket, max_frames=30, frame_skip=3, similarity_threshold=70):
+    async def recognize_with_websocket(self, websocket: WebSocket, max_frames=21, frame_skip=3, similarity_threshold=70):
         frame_count = 0
         processed = 0
+        loop = asyncio.get_running_loop()
 
         while processed < max_frames:
-            frame_count += 1
-            if frame_count % frame_skip != 0:
-                continue
-            processed += 1
-
+        # Luôn luôn đọc frame để tránh tràn bộ đệm WebSocket
             try:
                 data = await websocket.receive_bytes()
+            except Exception:
+                break # Kết thúc nếu kết nối bị ngắt
+
+            frame_count += 1
+
+            if frame_count % frame_skip == 0:
                 nparr = np.frombuffer(data, np.uint8)
                 frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 
-                results = self.recognize_frame(frame, similarity_threshold=similarity_threshold)
+                results = await loop.run_in_executor(executor, self.recognize_frame, frame, similarity_threshold)
+            
+                processed += 1
+                print(f"Processed frame {processed}/{max_frames}. Detections: {len(results)}")
+                
                 await websocket.send_json({"type": "detection", "results": results})
                 for r in results:
                     if r["unlock"]:
@@ -169,19 +205,11 @@ class FaceRecognizer:
                                 grouped[name].append(vec)
                             for name, vectors in grouped.items():
                                 self.update_encodings(name, vectors)
-                            self.pending_updates.clear()
-                        # user_id = get_user_id(r["name"])
-                        # if user_id is not None:
-                        #     log_access_attempt(user_id=user_id, success=True)
-                        # else:
-                        #     print(f"User {r['name']} not found in database")
+                        self.pending_updates.clear()
                         log_access_attempt(user_id=get_user_id(r["name"]), success=True)
-                        await websocket.send_json({"type": "decision", "decision": {"unlock": True, "user": r["name"], "similarity": r["similarity"]}})
-                        
+                        await websocket.send_json({"type": "decision", "decision": r})
+                        print(f"Recognition successful for user: {r['name']}")
                         return
-            except Exception as e:
-                print("error processing frame from websocket:", e)
-                continue  
         await websocket.close()
         
 

@@ -4,6 +4,9 @@ from typing import Optional
 import uvicorn
 import threading
 import json
+import asyncio
+import numpy as np
+import cv2
 from src.core import fetch_access_logs_for_user
 
 from src.core import FaceRecognizer
@@ -14,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 recognizer = None
+
+esp_clients = set()
 
 origins = [
     "http://localhost",
@@ -44,40 +49,15 @@ class RecognizeRequest(BaseModel):
     frame_skip: Optional[int] = 3
     similarity_threshold: Optional[int] = 70
 
-
-@app.post("/train")
-def api_train(req: TrainRequest):
-    # run training in background thread to avoid blocking
-    def _job():
-        # use DB-backed trainer
-        train.create_encodings_db(req.data_dir)
-
-    thread = threading.Thread(target=_job, daemon=True)
-    thread.start()
-    return {"status": "started", "data_dir": req.data_dir, "encodings_file": req.encodings_file}
-
-@app.post("/train_by_cam_url")
-def api_train_by_cam(req: TrainRequest):
-    def _job():
-        cam = req.camera_url
-        if isinstance(cam, str) and cam.isdigit():
-            cam = int(cam)
-        train.create_encodings_db_by_cam_url(
-            data_dir=req.data_dir,
-            camera_url=cam,
-            label=req.label,
-            target_frames=req.target_frames,
-            delay=req.delay
-        )
-
-    thread = threading.Thread(target=_job, daemon=True)
-    thread.start()
-    return {
-        "status": "started",
-        "data_dir": req.data_dir,
-        "label": req.label,
-        "target_frames": req.target_frames
-    }
+#test websocket 
+@app.websocket("/ws/test")
+async def ws_test(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        cfg = json.loads(data)
+        print("Received:", cfg)
+        await websocket.send_text(f"Echo: {cfg}")
 
 @app.websocket("/ws/train")
 async def ws_train(websocket: WebSocket):
@@ -90,16 +70,6 @@ async def ws_train(websocket: WebSocket):
     delay = int(cfg.get("delay", 6))
 
     await train.train_from_websocket(websocket, label=label, target_frames=target_frames, delay=delay)
-
-#test websocket 
-@app.websocket("/ws/test")
-async def ws_test(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        cfg = json.loads(data)
-        print("Received:", cfg)
-        await websocket.send_text(f"Echo: {cfg}")
         
 @app.websocket("/ws/logs")
 async def ws_show_logs(websocket: WebSocket):
@@ -149,6 +119,81 @@ def api_recognize(req: RecognizeRequest):
     decision = result.get("decision", {})
     return {"decision": decision, "detections": result.get("detections", [])}
 
+
+@app.websocket("/ws/cam")
+async def ws_cam(websocket: WebSocket):
+    global recognizer
+
+    await websocket.accept()
+    print("CAM connected")
+
+    if recognizer is None:
+        recognizer = FaceRecognizer()
+        
+    config = await websocket.receive_text()
+    cfg = json.loads(config)
+    similarity_threshold = int(cfg.get("similarity_threshold", 70))
+    key = cfg.get("key", "")
+    max_frames = int(cfg.get("max_frames", 10))
+    
+    esp_clients.add(websocket)
+    found = False
+    processed = 0
+    loop = asyncio.get_running_loop()
+
+    try:
+        while processed < max_frames:
+            # Nhận dữ liệu ảnh từ ESP32
+            data = await websocket.receive_bytes()
+            
+            # Giải mã frame
+            nparr = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if frame is None:
+                continue
+                
+            # Dùng recognize_frame để xử lý từng frame ảnh cụ thể
+            results = await loop.run_in_executor(None, recognizer.recognize_frame, frame, similarity_threshold)
+            processed += 1
+
+            for r in results:
+                if r.get("unlock"):
+                    name = r.get("name", "Unknown")
+                    confidence = float(r.get("similarity", 0))
+
+                    print(f">>> UNLOCK: {name} ({confidence:.1f}%)")
+
+                    for esp in list(esp_clients):
+                        try:
+                            await esp.send_text(json.dumps({
+                                "unlock": True,
+                                "name": name,
+                                "confidence": round(confidence, 1)
+                            }))
+                        except Exception:
+                            pass
+
+                    found = True
+                    return
+                    
+    except Exception as e:
+        print("CAM WS error:", e) 
+    finally:
+        esp_clients.discard(websocket)
+
+    if not found:
+        for esp in list(esp_clients):
+            try:
+                await esp.send_text(json.dumps({
+                    "unlock": False
+                }))
+            except Exception:
+                pass
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 @app.get("/")
 def root():

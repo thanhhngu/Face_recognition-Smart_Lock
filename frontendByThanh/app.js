@@ -119,6 +119,21 @@ async function startTraining() {
             cameraInfo.innerHTML = "<p>Camera access denied or not available</p>";
         }
         ws.onclose = () => {
+            console.log("WebSocket connection closed for training.");
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                cameraInfo.innerHTML = "<p>Camera stopped</p>";
+            }
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "error") {
+                alert(data.message);
+            }
             if (intervalId) {
                 clearInterval(intervalId);
             }
