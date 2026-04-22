@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException, status, Response, Cookie, Depends
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
@@ -8,6 +8,10 @@ import asyncio
 import numpy as np
 import cv2
 from src.core import fetch_access_logs_for_user
+from src.db import (
+    verify_user_credentials,
+    verify_key
+)
 
 from src.core import FaceRecognizer
 from src import train
@@ -16,9 +20,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI()
-recognizer = None
-
-esp_clients = set()
 
 origins = [
     "http://localhost",
@@ -34,6 +35,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+async def get_session_key(session_token: str = Cookie(None)):
+    if session_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+    if not verify_key(session_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid session token"
+        )
+    return session_token
+
+@app.get("/check-auth")
+async def check_auth(session_key: str = Depends(get_session_key)):
+    return {"status": "authenticated"}
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 class TrainRequest(BaseModel):
     data_dir: Optional[str] = "data"
@@ -48,10 +69,15 @@ class RecognizeRequest(BaseModel):
     max_frames: Optional[int] = 30
     frame_skip: Optional[int] = 3
     similarity_threshold: Optional[int] = 70
+    
+class LoginRequest(BaseModel):
+    email: str
+    password_hash: str
+    key_esp: str
 
 #test websocket 
 @app.websocket("/ws/test")
-async def ws_test(websocket: WebSocket):
+async def ws_test(websocket: WebSocket, session_token: str = Cookie(None)):
     await websocket.accept()
     while True:
         data = await websocket.receive_text()
@@ -60,8 +86,15 @@ async def ws_test(websocket: WebSocket):
         await websocket.send_text(f"Echo: {cfg}")
 
 @app.websocket("/ws/train")
-async def ws_train(websocket: WebSocket):
+async def ws_train(websocket: WebSocket, session_token: str = Cookie(None)):
+    if session_token is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    
+    key = session_token
+        
     await websocket.accept()
+    
     config = await websocket.receive_text()
     cfg = json.loads(config)
 
@@ -69,27 +102,37 @@ async def ws_train(websocket: WebSocket):
     target_frames = int(cfg.get("target_frames", 50))
     delay = int(cfg.get("delay", 6))
 
-    await train.train_from_websocket(websocket, label=label, target_frames=target_frames, delay=delay)
+    await train.train_from_websocket(websocket, label=label, key=key, target_frames=target_frames, delay=delay)
         
 @app.websocket("/ws/logs")
-async def ws_show_logs(websocket: WebSocket):
+async def ws_show_logs(websocket: WebSocket, session_token: str = Cookie(None)):
+    if session_token is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    key = session_token
+
     await websocket.accept()
     config = await websocket.receive_text()
     cfg = json.loads(config)
     un = cfg.get("user_name", "").strip()
     if un:
-        logs = fetch_access_logs_for_user(un)
+        logs = fetch_access_logs_for_user(un, key)
         await websocket.send_json({"logs": logs})
     else:
-        logs = fetch_access_logs_for_user("")
+        logs = fetch_access_logs_for_user("", key)
         await websocket.send_json({"logs": logs})
 
 @app.websocket("/ws/recognize")
-async def ws_recognize(websocket: WebSocket):
-    global recognizer
+async def ws_recognize(websocket: WebSocket, session_token: str = Cookie(None)):
+    if session_token is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    
+    key = session_token
+
     await websocket.accept()
-    if recognizer is None:
-        recognizer = FaceRecognizer()
+    recognizer = FaceRecognizer(key=key)
     config = await websocket.receive_text()
     cfg = json.loads(config)
     
@@ -98,37 +141,10 @@ async def ws_recognize(websocket: WebSocket):
 
     await recognizer.recognize_with_websocket(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
 
-@app.post("/recognize")
-def api_recognize(req: RecognizeRequest):
-    global recognizer
-    if recognizer is None:
-        recognizer = FaceRecognizer()
-    cam = req.camera_url
-    try:
-        if isinstance(cam, str) and cam.isdigit():
-            cam = int(cam)
-    except Exception:
-        pass
-
-    result = recognizer.recognize_stream_no_ui(
-        camera_url=cam,
-        max_frames=req.max_frames,
-        frame_skip=req.frame_skip,
-        similarity_threshold=req.similarity_threshold,
-    )
-    decision = result.get("decision", {})
-    return {"decision": decision, "detections": result.get("detections", [])}
-
-
 @app.websocket("/ws/cam")
 async def ws_cam(websocket: WebSocket):
-    global recognizer
-
     await websocket.accept()
     print("CAM connected")
-
-    if recognizer is None:
-        recognizer = FaceRecognizer()
         
     config = await websocket.receive_text()
     cfg = json.loads(config)
@@ -136,70 +152,57 @@ async def ws_cam(websocket: WebSocket):
     key = cfg.get("key", "")
     max_frames = int(cfg.get("max_frames", 10))
     
-    esp_clients.add(websocket)
-    found = False
-    processed = 0
-    loop = asyncio.get_running_loop()
+    frames = []
+    frame_count = 0
 
+    recognizer = FaceRecognizer(key=key)
     try:
-        while processed < max_frames:
-            # Nhận dữ liệu ảnh từ ESP32
-            data = await websocket.receive_bytes()
-            
-            # Giải mã frame
-            nparr = np.frombuffer(data, np.uint8)
-            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            
-            if frame is None:
-                continue
-                
-            # Dùng recognize_frame để xử lý từng frame ảnh cụ thể
-            results = await loop.run_in_executor(None, recognizer.recognize_frame, frame, similarity_threshold)
-            processed += 1
+        while frame_count < max_frames:
+            data = await websocket.receive()
 
-            for r in results:
-                if r.get("unlock"):
-                    name = r.get("name", "Unknown")
-                    confidence = float(r.get("similarity", 0))
+            if "bytes" in data:
+                frame_count += 1
 
-                    print(f">>> UNLOCK: {name} ({confidence:.1f}%)")
+                import numpy as np
+                import cv2
 
-                    for esp in list(esp_clients):
-                        try:
-                            await esp.send_text(json.dumps({
-                                "unlock": True,
-                                "name": name,
-                                "confidence": round(confidence, 1)
-                            }))
-                        except Exception:
-                            pass
+                nparr = np.frombuffer(data["bytes"], np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-                    found = True
-                    return
-                    
+                if frame is None:
+                    continue
+
+                frames.append(frame)
+
     except Exception as e:
-        print("CAM WS error:", e) 
-    finally:
-        esp_clients.discard(websocket)
-
-    if not found:
-        for esp in list(esp_clients):
-            try:
-                await esp.send_text(json.dumps({
-                    "unlock": False
-                }))
-            except Exception:
-                pass
-        try:
-            await websocket.close()
-        except Exception:
-            pass
-
-@app.get("/")
-def root():
-    return {"status": "ok"}
+        print("CAM WS error:", e)
 
 
+    await recognizer.recognize_arr_frames(websocket, frames, max_frames=max_frames, similarity_threshold=similarity_threshold)
+
+  
+@app.post("/login")
+async def login(data: LoginRequest, response: Response):
+
+    stored_key = verify_user_credentials(data.email, data.password_hash) 
+    
+    if stored_key and stored_key == data.key_esp:
+        # setup cookie
+        response.set_cookie(
+            key="session_token",
+            value=stored_key,
+            httponly=True,
+            secure=False,  # true if using HTTPS
+            samesite="lax",
+            max_age=3600
+        )
+        return {"status": "success", "message": "login successful"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid credentials"
+        )
+    
 if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=8000)
 #python -m uvicorn server:app --host 0.0.0.0 --port 8000

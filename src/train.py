@@ -1,9 +1,11 @@
+import json
+
 import cv2
 import os
 import asyncio
 import numpy as np
 from deepface import DeepFace
-from src.db import get_or_create_user, insert_encodings, user_exists
+from src.db import create_user, insert_encodings, user_exists
 from fastapi import WebSocket
 from concurrent.futures import ThreadPoolExecutor
 
@@ -54,12 +56,12 @@ def compute_embedding(frame):
         align=True
     )
 
-async def train_from_websocket(websocket: WebSocket, label: str, target_frames: int = 50, delay: int = 6):
-    if user_exists(label):
+async def train_from_websocket(websocket: WebSocket, label: str, key: str, target_frames: int = 50, delay: int = 6):
+    if user_exists(label, key):
         await websocket.close()
         return
     
-    user_id = get_or_create_user(label)
+    user_id = create_user(label, key)
     count = 0
     batch = []
     #get event loop running in main thread

@@ -1,17 +1,43 @@
 import InnerHTML from "./mdls/innerHTML.js";
 import WSSendFrame from "./mdls/WSSendFrame.js";
-
-var API_URL = 'http://localhost:8000';
-var WS_URL = 'localhost:8000';
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-var stream = null; 
+var stream = null;
 var intervalId = null;
-const stopBtn = document.getElementById("stop-preview"); 
+const stopBtn = document.getElementById("stop-preview");
 document.addEventListener('DOMContentLoaded', () => {
-    initializeEventListeners();
-    checkBackendConnection();
-    initializeCameraPreview();
+    checkAuthenticationAndInitialize();
 });
+
+// This function will gate access to the page.
+async function checkAuthenticationAndInitialize() {
+    try {
+        // Use the new /check-auth endpoint
+        const response = await fetch(`${API_URL}/check-auth`, { credentials: 'include' });
+
+        // If the response is 401 Unauthorized, the cookie is missing or invalid.
+        if (response.status === 401) {
+            alert("Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.");
+            // Redirect to the login page. Assuming it's in a 'login' subfolder.
+            window.location.href = 'login/login.html';
+            return; // Stop further execution
+        }
+
+        if (!response.ok) {
+            // Handle other server errors
+            throw new Error(`Authentication check failed: ${response.statusText}`);
+        }
+
+        // If authentication is successful, proceed to initialize the app.
+        console.log('User is authenticated. Initializing app...');
+        initializeEventListeners();
+        initializeCameraPreview();
+
+    } catch (error) {
+        console.error('Could not verify authentication:', error);
+        alert('Không thể kết nối đến máy chủ để xác thực. Vui lòng thử lại.');
+        window.location.href = 'login/login.html';
+    }
+}
 
 function initializeEventListeners() {
     // Tab navigation
@@ -49,16 +75,17 @@ function switchTab(tabName) {
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 }
 
-async function checkBackendConnection() {
-    try {
-        const response = await fetch(API_URL + '/');
-        if (response.ok) {
-            console.log('Backend is available');
-        }
-    } catch (error) {
-        console.error('Backend is not available:', error);
-    }
-}
+// setInterval(async () => {
+//     try {
+//         const response = await fetch(`${API_URL}/check-auth`, { credentials: 'include' });
+//         if (response.status === 401) {
+//             alert("login again!");
+//             window.location.href = 'login.html';
+//         }
+//     } catch (err) {
+//         console.error("error:", err);
+//     }
+// }, 300000);
 
 function initializeCameraPreview() {
     const startBtn = document.getElementById("start-preview");
@@ -106,12 +133,13 @@ async function startTraining() {
             target_frames: targetFrames,
             delay: delay
         }));
+
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
             videoElement.srcObject = stream;
             videoElement.play();
 
-            intervalId = WSSendFrame(ws, videoElement, 1.0, 500);
+            intervalId = WSSendFrame(ws, videoElement, 1.0, 1000);
 
             cameraInfo.innerHTML = "<p>Camera is active</p>";
         } catch (error) {

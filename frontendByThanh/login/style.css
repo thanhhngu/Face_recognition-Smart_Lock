@@ -1,0 +1,196 @@
+/* ========== RESET & BASE ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 62.5%;
+  font-family: "Poppins", "Open Sans", sans-serif;
+  color: #fff;
+}
+
+/* ========== LAYOUT ========== */
+.main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: url(./img/bglogin.jpg) center/cover no-repeat;
+  backdrop-filter: blur(5px);
+  position: relative;
+  overflow: hidden;
+}
+
+.main img {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 170px;
+  object-fit: cover;
+  z-index: 10;
+}
+
+
+/* Hiệu ứng ánh sáng nền động nhẹ */
+.main::before {
+  content: "";
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 0, 50, 0.15), transparent 60%),
+    radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.1), transparent 60%);
+  animation: glow 8s ease-in-out infinite alternate;
+  z-index: 0;
+}
+
+@keyframes glow {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  100% {
+    transform: translate(10%, 10%) rotate(10deg);
+  }
+}
+
+/* ========== FORM CONTAINER ========== */
+.form {
+  position: relative;
+  z-index: 1;
+  width: 380px;
+  padding: 40px 30px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.15),
+    inset 0 0 10px rgba(255, 255, 255, 0.05);
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ========== TEXT ========== */
+.form .heading {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.form .desc {
+  font-size: 1.4rem;
+  color: #ccc;
+  font-weight: 300;
+  margin-bottom: 28px;
+}
+
+/* ========== FORM INPUTS ========== */
+.form-group {
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.form-label {
+  display: block;
+  font-size: 1.3rem;
+  color: #eee;
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
+}
+
+.form-control {
+  width: 100%;
+  height: 42px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 1.4rem;
+  outline: none;
+  transition: 0.3s;
+}
+
+.form-control:focus {
+  border-color: #ff0026;
+  box-shadow: 0 0 8px rgba(255, 0, 38, 0.4);
+}
+
+/* ========== BUTTON ========== */
+.form-submit {
+  width: 100%;
+  padding: 14px;
+  margin-top: 20px;
+  border: none;
+  border-radius: 40px;
+  font-size: 1.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ff0026, #a10d24);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ánh sáng chạy trên nút */
+.form-submit::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  transform: skewX(-25deg);
+}
+
+.form-submit:hover::before {
+  animation: shine 1s ease-out;
+}
+
+@keyframes shine {
+  0% {
+    left: -75%;
+  }
+
+  100% {
+    left: 125%;
+  }
+}
+
+.form-submit:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 25px rgba(255, 0, 38, 0.5);
+}
+
+/* ========== LINKS ========== */
+form a {
+  display: block;
+  margin-top: 16px;
+  color: #ddd;
+  font-size: 1.3rem;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+form a:hover {
+  color: #ff0026;
+  text-decoration: underline;
+}
+
+/* ========== ERROR MESSAGE ========== */
+.form-message {
+  font-size: 1.2rem;
+  color: #f66;
+  margin-top: 4px;
+}

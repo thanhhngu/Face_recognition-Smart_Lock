@@ -1,4 +1,5 @@
 import asyncio
+import json
 import cv2
 import numpy as np
 from fastapi import WebSocket
@@ -7,6 +8,17 @@ from concurrent.futures import ThreadPoolExecutor
 
 executor = ThreadPoolExecutor(max_workers=1)
 
+from collections import defaultdict
+from src.db import (
+    fetch_all_encodings_with_names,
+    get_user_id,
+    create_user,
+    insert_encodings,
+    count_encodings_for_user,
+    delete_oldest_encodings,
+    log_access_attempt,
+    fetch_access_logs
+)
 
 
 def cosine_distance(a, b):
@@ -16,22 +28,10 @@ def cosine_distance(a, b):
 
 
 
-from collections import defaultdict
-from src.db import (
-    fetch_all_encodings_with_names,
-    get_user_id,
-    get_or_create_user,
-    insert_encodings,
-    count_encodings_for_user,
-    delete_oldest_encodings,
-    log_access_attempt,
-    fetch_access_logs
-)
-
 ARC_FACE_THRESHOLD = 0.68
 
-def fetch_access_logs_for_user(un: str):
-    logs = fetch_access_logs()
+def fetch_access_logs_for_user(un: str, key: str):
+    logs = fetch_access_logs(key=key)
     user_logs = defaultdict(list)
     for user_name, access_time, success in logs:
         user_logs[user_name].append((access_time, success))
@@ -42,17 +42,19 @@ def fetch_access_logs_for_user(un: str):
 
 
 class FaceRecognizer:
-    def __init__(self, encodings_file=None, max_count_per_user=50):
+    def __init__(self, encodings_file=None, max_count_per_user=50, key=None):
         # encodings_file retained for backward compatibility but ignored when using DB
         self.encodings_file = encodings_file
         self.replace_limit = 2
         self.update_count = 0
         self.pending_updates = []
         self.max_count_per_user = max_count_per_user
+        self.key = key
+        
 
         # load encodings from DB
         try:
-            encs, names = fetch_all_encodings_with_names()
+            encs, names = fetch_all_encodings_with_names(key=self.key)
             self.known_encodings = encs
             self.known_names = names
             print(f"Loaded {len(self.known_encodings)} known encodings from DB.")   
@@ -64,7 +66,7 @@ class FaceRecognizer:
     def update_encodings(self, name, new_vectors, max_count=50):
         # Insert provided vectors into DB for the given user name.
         try:
-            user_id = get_or_create_user(name)
+            user_id = get_user_id(name, self.key)
             # convert vectors to plain lists
             batch = [list(map(float, v)) for v in new_vectors]
             insert_encodings(user_id, batch)
@@ -74,7 +76,7 @@ class FaceRecognizer:
                 delete_oldest_encodings(user_id, max_count)
 
             # refresh in-memory lists (simple approach: append and reload from DB)
-            encs, names = fetch_all_encodings_with_names()
+            encs, names = fetch_all_encodings_with_names(key=self.key)
             self.known_encodings = encs
             self.known_names = names
         except Exception as e:
@@ -128,50 +130,6 @@ class FaceRecognizer:
 
         return results
 
-    def recognize_stream_no_ui(self, camera_url=0, max_frames=30, frame_skip=3, similarity_threshold=70):
-        cap = cv2.VideoCapture(camera_url)
-        frame_count = 0
-        processed = 0
-        detections = []
-        decision = {"unlock": False, "user": None, "similarity": 0.0}
-
-        while processed < max_frames:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame_count += 1
-            if frame_count % frame_skip != 0:
-                continue
-            processed += 1
-
-            results = self.recognize_frame(frame, similarity_threshold=similarity_threshold)
-            for r in results:
-                detections.append(r)
-                if r["unlock"] and r["similarity"] > decision["similarity"]:
-                    decision = {"unlock": True, "user": r["name"], "similarity": r["similarity"]}
-                    # flush pending updates and return early (fast unlock)
-                    cap.release()
-                    if self.pending_updates:
-                        grouped = defaultdict(list)
-                        for name, vec in self.pending_updates:
-                            grouped[name].append(vec)
-                        for name, vectors in grouped.items():
-                            self.update_encodings(name, vectors)
-                        self.pending_updates.clear()
-                    return {"detections": detections, "decision": decision}
-
-        cap.release()
-        # flush pending updates if any ***************************
-        if self.pending_updates:
-            grouped = defaultdict(list)
-            for name, vec in self.pending_updates:
-                grouped[name].append(vec)
-            for name, vectors in grouped.items():
-                self.update_encodings(name, vectors)
-            self.pending_updates.clear()
-
-        return {"detections": detections, "decision": decision}
-
     async def recognize_with_websocket(self, websocket: WebSocket, max_frames=21, frame_skip=3, similarity_threshold=70):
         frame_count = 0
         processed = 0
@@ -206,13 +164,46 @@ class FaceRecognizer:
                             for name, vectors in grouped.items():
                                 self.update_encodings(name, vectors)
                         self.pending_updates.clear()
-                        log_access_attempt(user_id=get_user_id(r["name"]), success=True)
+                        log_access_attempt(user_id=get_user_id(r["name"], self.key), success=True)
                         await websocket.send_json({"type": "decision", "decision": r})
                         print(f"Recognition successful for user: {r['name']}")
                         return
         await websocket.close()
         
+    async def recognize_arr_frames(self, websocket: WebSocket, frames: list, max_frames=21, similarity_threshold=70):
+        frame_count = 0
+        processed = 0
+        loop = asyncio.get_running_loop()
+        
+        found = False
+        
+        for frame in frames:
+            frame_count += 1
+            if frame_count % 2 == 0:
+                results = await loop.run_in_executor(executor, self.recognize_frame, frame, similarity_threshold)
+                processed += 1
+                
+                for r in results:
+                    if r.get("unlock"):
+                        name = r.get("name", "Unknown")
+                        confidence = float(r.get("similarity", 0))
 
+                        print(f">>> UNLOCK: {name} ({confidence:.1f}%)")
 
-
-    
+                        for esp in esp_clients:
+                            await esp.send_text(json.dumps({
+                                "unlock": True,
+                                "name": name,
+                                "confidence": round(confidence, 1)
+                            }))
+                        found = True
+                        return
+        
+        if not found:
+            for esp in esp_clients:
+                await esp.send_text(json.dumps({
+                    "unlock": False
+                }))            
+        
+        await websocket.close()
+        return    
