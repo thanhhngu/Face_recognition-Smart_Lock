@@ -1,5 +1,3 @@
-import json
-
 import cv2
 import os
 import asyncio
@@ -78,6 +76,7 @@ async def train_from_websocket(websocket: WebSocket, label: str, key: str, targe
             embedding_objs = await loop.run_in_executor(executor, compute_embedding, frame)
 
             for face_obj in embedding_objs:
+                print(f"Received embedding for user {label}, frame {count+1}/{target_frames}")
                 batch.append(face_obj['embedding'])
                 count += 1
                 if count >= target_frames:

@@ -2,11 +2,8 @@ from fastapi import FastAPI, WebSocket, HTTPException, status, Response, Cookie,
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
-import threading
 import json
-import asyncio
 import numpy as np
-import cv2
 from src.core import fetch_access_logs_for_user
 from src.db import (
     verify_user_credentials,
@@ -141,46 +138,6 @@ async def ws_recognize(websocket: WebSocket, session_token: str = Cookie(None)):
 
     await recognizer.recognize_with_websocket(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
 
-@app.websocket("/ws/cam")
-async def ws_cam(websocket: WebSocket):
-    await websocket.accept()
-    print("CAM connected")
-        
-    config = await websocket.receive_text()
-    cfg = json.loads(config)
-    similarity_threshold = int(cfg.get("similarity_threshold", 70))
-    key = cfg.get("key", "")
-    max_frames = int(cfg.get("max_frames", 10))
-    
-    frames = []
-    frame_count = 0
-
-    recognizer = FaceRecognizer(key=key)
-    try:
-        while frame_count < max_frames:
-            data = await websocket.receive()
-
-            if "bytes" in data:
-                frame_count += 1
-
-                import numpy as np
-                import cv2
-
-                nparr = np.frombuffer(data["bytes"], np.uint8)
-                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-                if frame is None:
-                    continue
-
-                frames.append(frame)
-
-    except Exception as e:
-        print("CAM WS error:", e)
-
-
-    await recognizer.recognize_arr_frames(websocket, frames, max_frames=max_frames, similarity_threshold=similarity_threshold)
-
-  
 @app.post("/login")
 async def login(data: LoginRequest, response: Response):
 

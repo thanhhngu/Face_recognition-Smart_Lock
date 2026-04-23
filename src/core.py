@@ -20,15 +20,18 @@ from src.db import (
     fetch_access_logs
 )
 
+ARC_FACE_THRESHOLD = 0.68
 
 def cosine_distance(a, b):
     a = np.array(a)
     b = np.array(b)
     return 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
+def get_similarity_percent(distance, threshold=1-ARC_FACE_THRESHOLD, k=15):
+    similarity = 1 / (1 + np.exp(k * (distance - threshold)))
+    return round(similarity * 100, 2)
 
 
-ARC_FACE_THRESHOLD = 0.68
 
 def fetch_access_logs_for_user(un: str, key: str):
     logs = fetch_access_logs(key=key)
@@ -97,7 +100,7 @@ class FaceRecognizer:
 
         results = []
         
-        distance_threshold = (100 - similarity_threshold) / 50 * ARC_FACE_THRESHOLD
+        distance_threshold = 1 - (similarity_threshold / 100)
 
         for face_obj in embedding_objs:
             face_encoding = face_obj['embedding']
@@ -114,7 +117,7 @@ class FaceRecognizer:
                 best_match_index = np.argmin(distances)
                 best_distance = distances[best_match_index]
 
-                similarity = max(0, 100 - (best_distance / ARC_FACE_THRESHOLD * 50))
+                similarity = get_similarity_percent(best_distance)
 
                 if best_distance <= distance_threshold:
                     name = self.known_names[best_match_index]
