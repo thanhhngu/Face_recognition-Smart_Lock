@@ -1,196 +1,370 @@
+/* ========== IMPORTS ========== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 /* ========== RESET & BASE ========== */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary: #00d4ff;
+    --primary-glow: rgba(0, 212, 255, 0.35);
+    --accent: #7c3aed;
+    --danger: #ef4444;
+    --bg-body: #0a0e1a;
+    --bg-card: rgba(15, 23, 42, 0.7);
+    --bg-input: rgba(30, 41, 59, 0.6);
+    --border: rgba(100, 116, 139, 0.25);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-full: 9999px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html {
-  font-size: 62.5%;
-  font-family: "Poppins", "Open Sans", sans-serif;
-  color: #fff;
+    font-size: 62.5%;
+    font-family: 'Inter', 'Poppins', 'Open Sans', sans-serif;
+    color: #fff;
 }
 
 /* ========== LAYOUT ========== */
 .main {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: url(./img/bglogin.jpg) center/cover no-repeat;
-  backdrop-filter: blur(5px);
-  position: relative;
-  overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(-45deg,
+        #0a0e1a,
+        #0c1631,
+        #1a0a2e,
+        #0a1628,
+        #0d1f3c,
+        #150a30,
+        #0a1e2e,
+        #0a0e1a
+    );
+    background-size: 400% 400%;
+    animation: gradientShift 20s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    25%  { background-position: 100% 0%; }
+    50%  { background-position: 100% 100%; }
+    75%  { background-position: 0% 100%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Floating orbs overlay */
+.main::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background:
+        radial-gradient(circle 350px at 15% 25%, rgba(0, 212, 255, 0.12), transparent),
+        radial-gradient(circle 300px at 85% 75%, rgba(124, 58, 237, 0.10), transparent),
+        radial-gradient(circle 250px at 50% 50%, rgba(16, 185, 129, 0.06), transparent);
+    animation: orbFloat 10s ease-in-out infinite alternate;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.main::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background:
+        radial-gradient(circle 200px at 70% 20%, rgba(0, 212, 255, 0.06), transparent),
+        radial-gradient(circle 280px at 25% 80%, rgba(168, 85, 247, 0.06), transparent);
+    animation: orbFloat 14s ease-in-out infinite alternate-reverse;
+    z-index: 0;
+    pointer-events: none;
+}
+
+@keyframes orbFloat {
+    0%   { transform: translate(0, 0) scale(1); }
+    50%  { transform: translate(3%, -3%) scale(1.05); }
+    100% { transform: translate(-2%, 2%) scale(0.98); }
 }
 
 .main img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 200px;
-  height: 170px;
-  object-fit: cover;
-  z-index: 10;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 200px;
+    height: 170px;
+    object-fit: cover;
+    z-index: 10;
 }
 
-
-/* Hiệu ứng ánh sáng nền động nhẹ */
-.main::before {
-  content: "";
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  top: -50%;
-  left: -50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 0, 50, 0.15), transparent 60%),
-    radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.1), transparent 60%);
-  animation: glow 8s ease-in-out infinite alternate;
-  z-index: 0;
-}
-
-@keyframes glow {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  100% {
-    transform: translate(10%, 10%) rotate(10deg);
-  }
-}
-
-/* ========== FORM CONTAINER ========== */
+/* ========== FORM CONTAINER (Glass) ========== */
 .form {
-  position: relative;
-  z-index: 1;
-  width: 380px;
-  padding: 40px 30px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 0 25px rgba(255, 255, 255, 0.15),
-    inset 0 0 10px rgba(255, 255, 255, 0.05);
-  text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
+    width: 420px;
+    max-width: 90vw;
+    padding: 44px 36px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    box-shadow:
+        0 8px 60px rgba(0, 0, 0, 0.35),
+        0 0 100px rgba(0, 212, 255, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    animation: formAppear 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Gradient border glow */
+.form::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: calc(var(--radius-lg) + 1px);
+    padding: 1px;
+    background: linear-gradient(
+        135deg,
+        rgba(0, 212, 255, 0.3),
+        rgba(124, 58, 237, 0.1) 30%,
+        transparent 50%,
+        rgba(124, 58, 237, 0.1) 70%,
+        rgba(0, 212, 255, 0.2)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: borderRotate 6s linear infinite;
+    background-size: 300% 300%;
+}
+
+@keyframes borderRotate {
+    0%   { background-position: 0% 0%; }
+    50%  { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+}
+
+@keyframes formAppear {
+    from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 /* ========== TEXT ========== */
 .form .heading {
-  font-size: 2.4rem;
-  font-weight: 700;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 10px;
-  position: relative;
+    font-size: 2.6rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary), #a78bfa, var(--primary));
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    animation: shimmerText 4s linear infinite;
+}
+
+@keyframes shimmerText {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
 }
 
 .form .desc {
-  font-size: 1.4rem;
-  color: #ccc;
-  font-weight: 300;
-  margin-bottom: 28px;
+    font-size: 1.3rem;
+    color: var(--text-muted);
+    font-weight: 300;
+    margin-bottom: 28px;
+    letter-spacing: 0.3px;
+}
+
+/* ========== SPACER ========== */
+.spacer {
+    height: 8px;
 }
 
 /* ========== FORM INPUTS ========== */
 .form-group {
-  margin-bottom: 18px;
-  text-align: left;
+    margin-bottom: 18px;
+    text-align: left;
 }
 
 .form-label {
-  display: block;
-  font-size: 1.3rem;
-  color: #eee;
-  margin-bottom: 6px;
-  letter-spacing: 0.3px;
+    display: block;
+    font-size: 1.3rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+    font-weight: 500;
 }
 
 .form-control {
-  width: 100%;
-  height: 42px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 1.4rem;
-  outline: none;
-  transition: 0.3s;
+    width: 100%;
+    height: 46px;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 1.4rem;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: var(--transition);
+    backdrop-filter: blur(6px);
 }
 
 .form-control:focus {
-  border-color: #ff0026;
-  box-shadow: 0 0 8px rgba(255, 0, 38, 0.4);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow), 0 0 20px rgba(0, 212, 255, 0.1);
+    background: rgba(30, 41, 59, 0.8);
+}
+
+.form-control::placeholder {
+    color: var(--text-muted);
+    font-size: 1.3rem;
 }
 
 /* ========== BUTTON ========== */
 .form-submit {
-  width: 100%;
-  padding: 14px;
-  margin-top: 20px;
-  border: none;
-  border-radius: 40px;
-  font-size: 1.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: linear-gradient(135deg, #ff0026, #a10d24);
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+    width: 100%;
+    padding: 14px;
+    margin-top: 24px;
+    border: none;
+    border-radius: var(--radius-full);
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), #0099cc);
+    color: var(--bg-body);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px var(--primary-glow);
 }
 
-/* ánh sáng chạy trên nút */
+/* Light sweep effect */
 .form-submit::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -75%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.7), transparent);
-  transform: skewX(-25deg);
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -80%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transform: skewX(-25deg);
+    transition: 0.7s;
 }
 
 .form-submit:hover::before {
-  animation: shine 1s ease-out;
-}
-
-@keyframes shine {
-  0% {
-    left: -75%;
-  }
-
-  100% {
-    left: 125%;
-  }
+    left: 130%;
 }
 
 .form-submit:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 0 25px rgba(255, 0, 38, 0.5);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 30px var(--primary-glow), 0 0 60px rgba(0, 212, 255, 0.15);
+}
+
+.form-submit:active {
+    transform: translateY(-1px);
 }
 
 /* ========== LINKS ========== */
-form a {
-  display: block;
-  margin-top: 16px;
-  color: #ddd;
-  font-size: 1.3rem;
-  text-decoration: none;
-  transition: color 0.3s;
+form a,
+#link-tab {
+    display: inline-block;
+    margin-top: 20px;
+    color: var(--text-muted);
+    font-size: 1.3rem;
+    text-decoration: none;
+    transition: var(--transition);
+    position: relative;
+    padding-bottom: 2px;
 }
 
-form a:hover {
-  color: #ff0026;
-  text-decoration: underline;
+form a::after,
+#link-tab::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 1px;
+    background: var(--primary);
+    transition: var(--transition);
+    transform: translateX(-50%);
+}
+
+form a:hover,
+#link-tab:hover {
+    color: var(--primary);
+}
+
+form a:hover::after,
+#link-tab:hover::after {
+    width: 100%;
 }
 
 /* ========== ERROR MESSAGE ========== */
 .form-message {
-  font-size: 1.2rem;
-  color: #f66;
-  margin-top: 4px;
+    display: block;
+    font-size: 1.2rem;
+    color: var(--danger);
+    margin-top: 4px;
+    min-height: 1.6em;
+    transition: var(--transition);
+}
+
+/* ========== FORM GROUP INVALID STATE ========== */
+.form-group.invalid .form-control {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.form-group.invalid .form-message {
+    color: var(--danger);
+}
+
+/* ========== SCROLLBAR ========== */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.4);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.6);
 }
