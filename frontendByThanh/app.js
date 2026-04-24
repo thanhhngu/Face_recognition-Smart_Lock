@@ -55,6 +55,8 @@ function initializeEventListeners() {
 
     // Access logs    
     document.getElementById('get-logs').addEventListener('click', fetchAccessLogs);
+
+
 }
 
 function switchTab(tabName) {

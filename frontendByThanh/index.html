@@ -27,6 +27,7 @@
             <button class="nav-btn active" data-tab="train">Train</button>
             <button class="nav-btn" data-tab="recognize">Recognize</button>
             <button class="nav-btn" data-tab="info">Info</button>
+            <button class="nav-btn" data-tab="face-management">Face Management</button>
         </nav>
         <main class="tab-content">
             <section id="train" class="tab-pane active">
@@ -103,6 +104,18 @@
                     </div>
                     <div id="root-logs">
 
+                    </div>
+                </div>
+            </section>
+            <section id="face-management" class="tab-pane">
+                <div class="section-card">
+                    <div class="from-group">
+                        <label for="user-name">Person's Name:</label>
+                        <input type="text" id="user-name" placeholder="Enter person's name" required>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn-primary" id="update-user">Update User</button>
+                        <button class="btn-primary" id="delete-user">Delete User</button>
                     </div>
                 </div>
             </section>
