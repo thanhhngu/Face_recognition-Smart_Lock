@@ -4,6 +4,7 @@ from typing import Optional
 import uvicorn
 import json
 import numpy as np
+import cv2
 from src.core import fetch_access_logs_for_user
 from src.db import (
     verify_user_credentials,
@@ -15,7 +16,7 @@ from src import train
 
 from fastapi.middleware.cors import CORSMiddleware
 
-
+esp_clients = []  
 app = FastAPI()
 
 origins = [
@@ -159,7 +160,36 @@ async def login(data: LoginRequest, response: Response):
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Invalid credentials"
         )
+        
+@app.websocket("/ws/esp")
+async def ws_esp(websocket: WebSocket):
+    await websocket.accept()
+    esp_clients.append(websocket)
+    print("ESP connected")
+
+    try:
+        while True:
+            await websocket.receive_text()  # giữ kết nối
+    except:
+        esp_clients.remove(websocket)
+        print("ESP disconnected")
+
+
+@app.websocket("/ws/cam")
+async def ws_cam(websocket: WebSocket):
+    await websocket.accept()
+    print("CAM connected")
+        
+    config = await websocket.receive_text()
+    cfg = json.loads(config)
+    similarity_threshold = int(cfg.get("similarity_threshold", 70))
+    key = cfg.get("key", "")
+    max_frames = int(cfg.get("max_frames", 10))
     
+    recognizer = FaceRecognizer(key=key)
+
+    await recognizer.prosess_camera_stream(websocket, frames=[], max_frames=max_frames, similarity_threshold=similarity_threshold)
+   
 if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=8000)
 #python -m uvicorn server:app --host 0.0.0.0 --port 8000

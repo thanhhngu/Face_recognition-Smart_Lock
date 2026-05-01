@@ -99,8 +99,6 @@ class FaceRecognizer:
             return []
 
         results = []
-        
-        distance_threshold = 1 - (similarity_threshold / 100)
 
         for face_obj in embedding_objs:
             face_encoding = face_obj['embedding']
@@ -119,7 +117,7 @@ class FaceRecognizer:
 
                 similarity = get_similarity_percent(best_distance)
 
-                if best_distance <= distance_threshold:
+                if similarity >= similarity_threshold:
                     name = self.known_names[best_match_index]
                     unlock = True
                     if len(self.pending_updates) < 3:
@@ -173,40 +171,58 @@ class FaceRecognizer:
                         return
         await websocket.close()
         
-    async def recognize_arr_frames(self, websocket: WebSocket, frames: list, max_frames=21, similarity_threshold=70):
-        frame_count = 0
-        processed = 0
+    async def prosess_camera_stream(self, websocket: WebSocket, frames, max_frames, similarity_threshold):
         loop = asyncio.get_running_loop()
+        frame_count = 0
+        unlocked = False
+        grouped = defaultdict(list)
         
-        found = False
-        
-        for frame in frames:
-            frame_count += 1
-            if frame_count % 2 == 0:
-                results = await loop.run_in_executor(executor, self.recognize_frame, frame, similarity_threshold)
-                processed += 1
-                
-                for r in results:
-                    if r.get("unlock"):
-                        name = r.get("name", "Unknown")
-                        confidence = float(r.get("similarity", 0))
+        try:
+            while frame_count < max_frames:
+                data = await websocket.receive()
 
-                        print(f">>> UNLOCK: {name} ({confidence:.1f}%)")
-
-                        for esp in esp_clients:
-                            await esp.send_text(json.dumps({
+                if "bytes" in data:
+                    nparr = np.frombuffer(data["bytes"], np.uint8)
+                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    
+                    if frame is None:
+                        continue
+                    
+                    results = await loop.run_in_executor(executor, self.recognize_frame, frame, similarity_threshold)
+                    
+                    frame_count += 1
+                    
+                    for r in results:
+                        if r["unlock"]:
+                            log_access_attempt(user_id=get_user_id(r["name"], self.key), success=True)
+                            await websocket.send_text(json.dumps({
+                                "type": "result",
                                 "unlock": True,
-                                "name": name,
-                                "confidence": round(confidence, 1)
+                                "name": r["name"],
+                                "confidence": round(r["similarity"], 1)
                             }))
-                        found = True
-                        return
+                            unlocked = True
+                            print(f"Recognition successful for user: {r['name']}")
+                            break
+                    
+                    if unlocked:
+                        break
+        except Exception as e:
+            print("Error processing camera stream:", e)
         
-        if not found:
-            for esp in esp_clients:
-                await esp.send_text(json.dumps({
-                    "unlock": False
-                }))            
+        if not unlocked:
+            await websocket.send_text(json.dumps({
+                "type": "result",
+                "unlock": False
+            }))
         
         await websocket.close()
-        return    
+        
+        if self.pending_updates:
+            for name, vec in self.pending_updates:
+                grouped[name].append(vec)
+            for name, vectors in grouped.items():
+                self.update_encodings(name, vectors)
+        self.pending_updates.clear()   
+        
+        return             
