@@ -141,7 +141,7 @@ async function startTraining() {
             videoElement.srcObject = stream;
             videoElement.play();
 
-            intervalId = WSSendFrame(ws, videoElement, 1.0, 1000);
+            intervalId = WSSendFrame(ws, videoElement, 1.0, 1500);
 
             cameraInfo.innerHTML = "<p>Camera is active</p>";
         } catch (error) {
@@ -188,7 +188,7 @@ async function startRecognition() {
             videoElement.srcObject = stream;
             videoElement.play();
 
-            intervalId = WSSendFrame(ws, videoElement, 1.0, 500);
+            intervalId = WSSendFrame(ws, videoElement, 1.0, 1000);
 
             cameraInfo.innerHTML = "<p>Camera is active</p>";
         } catch (error) {

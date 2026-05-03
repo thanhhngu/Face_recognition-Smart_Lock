@@ -171,7 +171,12 @@ class FaceRecognizer:
                         return
         await websocket.close()
         
-    async def prosess_camera_stream(self, websocket: WebSocket, frames, max_frames, similarity_threshold):
+    def _log_success_sync(self, name):
+        user_id = get_user_id(name, self.key)
+        if user_id:
+            log_access_attempt(user_id=user_id, success=True)
+
+    async def process_camera_stream(self, websocket: WebSocket, max_frames, similarity_threshold):
         loop = asyncio.get_running_loop()
         frame_count = 0
         unlocked = False
@@ -194,7 +199,7 @@ class FaceRecognizer:
                     
                     for r in results:
                         if r["unlock"]:
-                            log_access_attempt(user_id=get_user_id(r["name"], self.key), success=True)
+                            await loop.run_in_executor(executor, self._log_success_sync, r["name"])
                             await websocket.send_text(json.dumps({
                                 "type": "result",
                                 "unlock": True,
@@ -207,22 +212,30 @@ class FaceRecognizer:
                     
                     if unlocked:
                         break
+                else:
+                    #dam bao khi sai kieu du lieu
+                    frame_count += 1
+
+            if not unlocked:
+                await websocket.send_text(json.dumps({
+                    "type": "result",
+                    "unlock": False
+                }))
+            
+            await websocket.close()
+           
+        # bat loi close ws 
         except Exception as e:
-            print("Error processing camera stream:", e)
-        
-        if not unlocked:
-            await websocket.send_text(json.dumps({
-                "type": "result",
-                "unlock": False
-            }))
-        
-        await websocket.close()
+            try:
+                await websocket.close()
+            except Exception:
+                pass
         
         if self.pending_updates:
             for name, vec in self.pending_updates:
                 grouped[name].append(vec)
             for name, vectors in grouped.items():
-                self.update_encodings(name, vectors)
+                await loop.run_in_executor(executor, self.update_encodings, name, vectors)
         self.pending_updates.clear()   
         
         return             

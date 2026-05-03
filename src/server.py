@@ -188,8 +188,24 @@ async def ws_cam(websocket: WebSocket):
     
     recognizer = FaceRecognizer(key=key)
 
-    await recognizer.prosess_camera_stream(websocket, frames=[], max_frames=max_frames, similarity_threshold=similarity_threshold)
-   
+    await recognizer.process_camera_stream(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
+
+# @app.websocket("/ws/cam-stream")
+# async def cam_stream(websocket: WebSocket):
+#     await websocket.accept()
+#     try:
+#         while True:
+#             if latest_frame is not None:
+#                 # Chuyển ảnh từ OpenCV sang JPEG bytes để gửi về Web
+#                 _, buffer = cv2.imencode('.jpg', latest_frame)
+#                 await websocket.send_bytes(buffer.tobytes())
+#             await asyncio.sleep(0.04) # Giới hạn ~25 FPS để tiết kiệm tài nguyên
+#     except Exception as e:
+#         print(f"Stream client disconnected: {e}")  
+#     finally:
+#         await websocket.close()
+
+ 
 if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=8000)
 #python -m uvicorn server:app --host 0.0.0.0 --port 8000
