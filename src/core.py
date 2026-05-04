@@ -218,7 +218,6 @@ class FaceRecognizer:
 
             if not unlocked:
                 await websocket.send_text(json.dumps({
-                    "type": "result",
                     "unlock": False
                 }))
             
@@ -231,11 +230,12 @@ class FaceRecognizer:
             except Exception:
                 pass
         
-        if self.pending_updates:
-            for name, vec in self.pending_updates:
-                grouped[name].append(vec)
-            for name, vectors in grouped.items():
-                await loop.run_in_executor(executor, self.update_encodings, name, vectors)
-        self.pending_updates.clear()   
-        
+        if unlocked:
+            if self.pending_updates:
+                for name, vec in self.pending_updates:
+                    grouped[name].append(vec)
+                for name, vectors in grouped.items():
+                    await loop.run_in_executor(executor, self.update_encodings, name, vectors)
+            self.pending_updates.clear()   
+            
         return             

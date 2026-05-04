@@ -1,10 +1,12 @@
-from fastapi import FastAPI, WebSocket, HTTPException, status, Response, Cookie, Depends
+from fastapi import FastAPI, WebSocket, HTTPException, status, Response, Cookie, Depends, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
 import json
 import numpy as np
 import cv2
+import asyncio
+from functools import partial
 from src.core import fetch_access_logs_for_user
 from src.db import (
     verify_user_credentials,
@@ -180,15 +182,43 @@ async def ws_cam(websocket: WebSocket):
     await websocket.accept()
     print("CAM connected")
         
-    config = await websocket.receive_text()
-    cfg = json.loads(config)
+    try:
+        config = await websocket.receive_text()
+        cfg = json.loads(config)
+    except WebSocketDisconnect:
+        print("CAM disconnected before sending config")
+        return
+    except json.JSONDecodeError:
+        print("CAM sent invalid JSON config")
+        await websocket.close(code=status.WS_1003_UNSUPPORTED_DATA)
+        return
+    except Exception as e:
+        print(f"Error receiving CAM config: {e}")
+        await websocket.close()
+        return
+        
     similarity_threshold = int(cfg.get("similarity_threshold", 70))
     key = cfg.get("key", "")
     max_frames = int(cfg.get("max_frames", 10))
     
-    recognizer = FaceRecognizer(key=key)
-
-    await recognizer.process_camera_stream(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
+    if not key or not verify_key(key):
+        print(f"CAM provided invalid or empty key: {key}")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    
+    try:
+        loop = asyncio.get_running_loop()
+        # Chạy khởi tạo FaceRecognizer trên ThreadPool để không block event loop
+        recognizer = await loop.run_in_executor(None, partial(FaceRecognizer, key=key))
+        await recognizer.process_camera_stream(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
+    except WebSocketDisconnect:
+        print("CAM websocket disconnected during processing")
+    except Exception as e:
+        print(f"CAM processing error: {e}")
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 # @app.websocket("/ws/cam-stream")
 # async def cam_stream(websocket: WebSocket):
