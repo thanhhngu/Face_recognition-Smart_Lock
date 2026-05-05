@@ -18,7 +18,6 @@ from src import train
 
 from fastapi.middleware.cors import CORSMiddleware
 
-esp_clients = []  
 app = FastAPI()
 
 origins = [
@@ -29,7 +28,7 @@ origins = [
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,   # hoặc ["*"] để cho phép tất cả
+    allow_origins=["*"],   # hoặc ["*"] để cho phép tất cả
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -166,17 +165,15 @@ async def login(data: LoginRequest, response: Response):
 @app.websocket("/ws/esp")
 async def ws_esp(websocket: WebSocket):
     await websocket.accept()
-    esp_clients.append(websocket)
     print("ESP connected")
 
     try:
         while True:
             await websocket.receive_text()  # giữ kết nối
     except:
-        esp_clients.remove(websocket)
+
         print("ESP disconnected")
-
-
+        
 @app.websocket("/ws/cam")
 async def ws_cam(websocket: WebSocket):
     await websocket.accept()
@@ -200,15 +197,12 @@ async def ws_cam(websocket: WebSocket):
     similarity_threshold = int(cfg.get("similarity_threshold", 70))
     key = cfg.get("key", "")
     max_frames = int(cfg.get("max_frames", 10))
-    
-    if not key or not verify_key(key):
-        print(f"CAM provided invalid or empty key: {key}")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
+    print(f"Key: {key}, Max Frames: {max_frames}")
     
     try:
         loop = asyncio.get_running_loop()
         # Chạy khởi tạo FaceRecognizer trên ThreadPool để không block event loop
+        print("1")
         recognizer = await loop.run_in_executor(None, partial(FaceRecognizer, key=key))
         await recognizer.process_camera_stream(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
     except WebSocketDisconnect:

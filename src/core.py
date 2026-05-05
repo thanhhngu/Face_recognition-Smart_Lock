@@ -66,7 +66,7 @@ class FaceRecognizer:
             self.known_encodings = []
             self.known_names = []
    
-    def update_encodings(self, name, new_vectors, max_count=50):
+    def update_encodings(self, name, new_vectors, max_count=10):
         # Insert provided vectors into DB for the given user name.
         try:
             user_id = get_user_id(name, self.key)
@@ -178,10 +178,9 @@ class FaceRecognizer:
 
     async def process_camera_stream(self, websocket: WebSocket, max_frames, similarity_threshold):
         loop = asyncio.get_running_loop()
-        frame_count = 0
         unlocked = False
-        grouped = defaultdict(list)
-        
+        print("2")
+        frame_count = 0
         try:
             while frame_count < max_frames:
                 data = await websocket.receive()
@@ -196,10 +195,17 @@ class FaceRecognizer:
                     results = await loop.run_in_executor(executor, self.recognize_frame, frame, similarity_threshold)
                     
                     frame_count += 1
+                    print(f"Processed frame {frame_count}/{max_frames}. Detections: {len(results)}")
                     
                     for r in results:
                         if r["unlock"]:
+                            print(r)
                             await loop.run_in_executor(executor, self._log_success_sync, r["name"])
+                            await websocket.send_text(json.dumps({
+                                 "unlock": True,
+                                 "name": name,
+                                 "confidence": round(r["similarity"], 1)
+                             }))
                             await websocket.send_text(json.dumps({
                                 "type": "result",
                                 "unlock": True,
@@ -212,15 +218,27 @@ class FaceRecognizer:
                     
                     if unlocked:
                         break
+
                 else:
                     #dam bao khi sai kieu du lieu
                     frame_count += 1
-
             if not unlocked:
+                print("3")
+                await websocket.send_text(json.dumps({"unlock": False}))
                 await websocket.send_text(json.dumps({
-                    "unlock": False
+                "type": "result",
+                "unlock": False
                 }))
             
+            # Xả (drain) các frame còn tồn đọng trong buffer (luồng nhận)
+            # trước khi đóng kết nối để tránh lỗi do chưa đọc hết data.
+            try:
+                while True:
+                    # Đọc bỏ các frame còn kẹt với timeout nhỏ (50ms)
+                    await asyncio.wait_for(websocket.receive(), timeout=0.05)
+            except Exception:
+                pass
+
             await websocket.close()
            
         # bat loi close ws 
@@ -232,6 +250,7 @@ class FaceRecognizer:
         
         if unlocked:
             if self.pending_updates:
+                grouped = defaultdict(list)
                 for name, vec in self.pending_updates:
                     grouped[name].append(vec)
                 for name, vectors in grouped.items():
