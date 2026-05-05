@@ -18,6 +18,25 @@ conn = mysql.connector.connect(
     database=os.getenv("DB_NAME")
 )
 
+def delete_user(name: str, key: str):
+    cursor = conn.cursor()         
+    try:
+        cursor.execute("Select id from users where name=%s and api_key=%s", (name, key))
+        user_id = cursor.fetchone()[0]
+        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        conn.commit()
+    finally:
+        cursor.close()
+
+def get_user(key: str) -> str:
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT name FROM users WHERE api_key = %s", (key,))
+        rows = cursor.fetchall()
+        return [(row[0]) for row in rows]
+    finally:
+        cursor.close()
+
 def verify_key(key: str) -> bool:
     cursor = conn.cursor()
     try:

@@ -524,3 +524,52 @@ body::after {
     .nav-btn { padding: 9px 6px; font-size: 0.76rem; }
     .tab-pane { padding: 18px 14px; }
 }
+
+
+.user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    margin-bottom: 5px;
+    background: #f8fafc;
+    border-left: 3px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: 'Inter', monospace;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+
+.user-item:hover {
+    background: #fff;
+    border-left-color: var(--primary);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-delete {
+    background-color: var(--danger);
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    transition: var(--transition);
+}
+
+.btn-delete:hover {
+    background-color: #dc2626; /* Đỏ đậm hơn khi hover */
+    box-shadow: 0 2px 8px var(--danger-glow);
+}
+
+.btn-delete:active {
+    background-color: #b91c1c; 
+}

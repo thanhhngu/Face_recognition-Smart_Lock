@@ -17,7 +17,7 @@ from src.db import (
     count_encodings_for_user,
     delete_oldest_encodings,
     log_access_attempt,
-    fetch_access_logs
+    fetch_access_logs,
 )
 
 ARC_FACE_THRESHOLD = 0.68
@@ -42,7 +42,7 @@ def fetch_access_logs_for_user(un: str, key: str):
         return user_logs
     else:
         return user_logs.get(un, [])
-
+    
 
 class FaceRecognizer:
     def __init__(self, encodings_file=None, max_count_per_user=50, key=None):
@@ -90,7 +90,7 @@ class FaceRecognizer:
             embedding_objs = DeepFace.represent(
                 img_path=image,
                 model_name='ArcFace',
-                enforce_detection=False,
+                enforce_detection=True,
                 detector_backend='retinaface',
                 align=True
             )
@@ -176,85 +176,87 @@ class FaceRecognizer:
         if user_id:
             log_access_attempt(user_id=user_id, success=True)
 
-    async def process_camera_stream(self, websocket: WebSocket, max_frames, similarity_threshold):
+    async def process_camera_stream(self, websocket: WebSocket, max_frames, similarity_threshold, esp_clients):
         loop = asyncio.get_running_loop()
         unlocked = False
-        print("2")
         frame_count = 0
+
         try:
             while frame_count < max_frames:
-                data = await websocket.receive()
+                try:
+                    data = await websocket.receive_bytes()
+                except:
+                    break
 
-                if "bytes" in data:
-                    nparr = np.frombuffer(data["bytes"], np.uint8)
-                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                    
-                    if frame is None:
-                        continue
-                    
-                    results = await loop.run_in_executor(executor, self.recognize_frame, frame, similarity_threshold)
-                    
-                    frame_count += 1
-                    print(f"Processed frame {frame_count}/{max_frames}. Detections: {len(results)}")
-                    
-                    for r in results:
-                        if r["unlock"]:
-                            print(r)
-                            await loop.run_in_executor(executor, self._log_success_sync, r["name"])
-                            await websocket.send_text(json.dumps({
-                                 "unlock": True,
-                                 "name": name,
-                                 "confidence": round(r["similarity"], 1)
-                             }))
-                            await websocket.send_text(json.dumps({
-                                "type": "result",
+                frame_count += 1
+
+                nparr = np.frombuffer(data, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+                if frame is None:
+                    continue
+
+                results = await loop.run_in_executor(
+                    executor,
+                    self.recognize_frame,
+                    frame,
+                    similarity_threshold
+                )
+
+                for r in results:
+                    if r["unlock"]:
+                        unlocked = True
+
+                        name = r["name"]
+                        confidence = r["similarity"]
+
+                        esp = esp_clients.get(self.key)
+
+                        print("Current key:", self.key)
+                        print("Available ESP:", list(esp_clients.keys())) 
+
+                        if esp:
+                            print(f"[ESP] Send unlock to {self.key}")
+                            await esp.send_text(json.dumps({
                                 "unlock": True,
-                                "name": r["name"],
-                                "confidence": round(r["similarity"], 1)
+                                "name": name,
+                                "confidence": round(confidence, 1)
                             }))
-                            unlocked = True
-                            print(f"Recognition successful for user: {r['name']}")
-                            break
-                    
-                    if unlocked:
-                        break
+                        else:
+                            print(f"[ESP] No ESP found for key: {self.key}")
 
-                else:
-                    #dam bao khi sai kieu du lieu
-                    frame_count += 1
+                        await websocket.send_text(json.dumps({
+                            "type": "result",
+                            "unlock": True,
+                            "name": name,
+                            "confidence": round(confidence, 1)
+                        }))
+
+                        await loop.run_in_executor(
+                            executor,
+                            self._log_success_sync,
+                            name
+                        )
+
+                        await websocket.close()
+                        return
+
+            # nếu không unlock
             if not unlocked:
-                print("3")
-                await websocket.send_text(json.dumps({"unlock": False}))
+                esp = esp_clients.get(self.key)
+            if esp:
+                await esp.send_text(json.dumps({"unlock": False}))
+
                 await websocket.send_text(json.dumps({
-                "type": "result",
-                "unlock": False
+                    "type": "result",
+                    "unlock": False
                 }))
-            
-            # Xả (drain) các frame còn tồn đọng trong buffer (luồng nhận)
-            # trước khi đóng kết nối để tránh lỗi do chưa đọc hết data.
-            try:
-                while True:
-                    # Đọc bỏ các frame còn kẹt với timeout nhỏ (50ms)
-                    await asyncio.wait_for(websocket.receive(), timeout=0.05)
-            except Exception:
-                pass
 
             await websocket.close()
-           
-        # bat loi close ws 
+
         except Exception as e:
+            print("ERROR:", e)
             try:
                 await websocket.close()
-            except Exception:
+            except:
                 pass
-        
-        if unlocked:
-            if self.pending_updates:
-                grouped = defaultdict(list)
-                for name, vec in self.pending_updates:
-                    grouped[name].append(vec)
-                for name, vectors in grouped.items():
-                    await loop.run_in_executor(executor, self.update_encodings, name, vectors)
-            self.pending_updates.clear()   
-            
-        return             

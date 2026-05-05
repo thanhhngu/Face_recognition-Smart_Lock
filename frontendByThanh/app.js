@@ -56,6 +56,10 @@ function initializeEventListeners() {
     // Access logs    
     document.getElementById('get-logs').addEventListener('click', fetchAccessLogs);
 
+    //Management
+
+    document.getElementById('get-user').addEventListener('click', getUserName);
+
 
 }
 
@@ -223,4 +227,60 @@ async function fetchAccessLogs() {
             console.error("Error parsing logs:", error);
         }
     }
+}
+
+async function getUserName() {
+    const rootLogContainer = document.getElementById("root-username");
+    const ws = new WebSocket(`${protocol}://${WS_URL}/ws/get_user_name`);
+    ws.onopen = async () => {
+       
+    };
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log(data);
+            if (Array.isArray(data)) {
+                rootLogContainer.innerHTML = '';
+                data.forEach(user => {
+                    const pElement = document.createElement("p");
+                    pElement.className = "user-item"; 
+                    
+                    const nameSpan = document.createElement("span");
+                    nameSpan.textContent = user;
+                    
+                    const deleteBtn = document.createElement("button");
+                    deleteBtn.textContent = "x";
+                    deleteBtn.className = "btn-delete";
+                    
+                    deleteBtn.addEventListener("click", async () => {
+                        const targetUser = user;
+                        
+                        await deleteUserName(targetUser);
+                        getUserName(); // Gọi lại hàm này để load lại danh sách vào rootusername
+                    });
+                    
+                    pElement.appendChild(nameSpan);
+                    pElement.appendChild(deleteBtn);
+                    rootLogContainer.appendChild(pElement);
+                });
+            }
+        } catch (error) {
+            console.error("Error parsing logs:", error);
+        }
+    }
+}
+
+async function deleteUserName(userName) {
+    return new Promise((resolve, reject) => {
+        const ws = new WebSocket(`${protocol}://${WS_URL}/ws/delete_user_name`);
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ user_name: userName }));
+        };
+        ws.onclose = () => {
+            resolve(); 
+        };
+        ws.onerror = (error) => {
+            reject(error);
+        };
+    });
 }

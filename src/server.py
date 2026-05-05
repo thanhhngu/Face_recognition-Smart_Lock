@@ -10,7 +10,9 @@ from functools import partial
 from src.core import fetch_access_logs_for_user
 from src.db import (
     verify_user_credentials,
-    verify_key
+    verify_key,
+    get_user,
+    delete_user
 )
 
 from src.core import FaceRecognizer
@@ -19,6 +21,7 @@ from src import train
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+esp_clients = {}
 
 origins = [
     "http://localhost",
@@ -121,7 +124,34 @@ async def ws_show_logs(websocket: WebSocket, session_token: str = Cookie(None)):
     else:
         logs = fetch_access_logs_for_user("", key)
         await websocket.send_json({"logs": logs})
+        
+@app.websocket("/ws/get_user_name")
+async def ws_get_user_name(websocket: WebSocket, session_token: str = Cookie(None)):
+    if session_token is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
 
+    key = session_token
+    await websocket.accept()
+    data = get_user(key)
+    await websocket.send_json(data)
+    await websocket.close()
+    
+@app.websocket("/ws/delete_user_name")
+async def ws_get_user_name(websocket: WebSocket, session_token: str = Cookie(None)):
+    if session_token is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    key = session_token
+    await websocket.accept()
+    config = await websocket.receive_text()
+    cfg = json.loads(config)
+    un = cfg.get("user_name").strip()
+    
+    delete_user(un, key)
+    await websocket.close()
+    
 @app.websocket("/ws/recognize")
 async def ws_recognize(websocket: WebSocket, session_token: str = Cookie(None)):
     if session_token is None:
@@ -161,18 +191,30 @@ async def login(data: LoginRequest, response: Response):
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Invalid credentials"
         )
-        
+      
 @app.websocket("/ws/esp")
 async def ws_esp(websocket: WebSocket):
+    key = websocket.query_params.get("key")
+
+    if not key:
+        await asyncio.sleep(0.05)
+        await websocket.close()
+        return
+
     await websocket.accept()
-    print("ESP connected")
+    esp_clients[key] = websocket
+    print(f"ESP connected: {key}")
+    print("ESP clients:", list(esp_clients.keys()))
 
     try:
         while True:
             await websocket.receive_text()  # giữ kết nối
     except:
-
-        print("ESP disconnected")
+        print(f"ESP disconnected: {key}")
+    finally:
+        if key in esp_clients:
+            del esp_clients[key]
+        print("ESP clients:", list(esp_clients.keys()))
         
 @app.websocket("/ws/cam")
 async def ws_cam(websocket: WebSocket):
@@ -199,20 +241,14 @@ async def ws_cam(websocket: WebSocket):
     max_frames = int(cfg.get("max_frames", 10))
     print(f"Key: {key}, Max Frames: {max_frames}")
     
-    try:
-        loop = asyncio.get_running_loop()
-        # Chạy khởi tạo FaceRecognizer trên ThreadPool để không block event loop
-        print("1")
-        recognizer = await loop.run_in_executor(None, partial(FaceRecognizer, key=key))
-        await recognizer.process_camera_stream(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
-    except WebSocketDisconnect:
-        print("CAM websocket disconnected during processing")
-    except Exception as e:
-        print(f"CAM processing error: {e}")
-        try:
-            await websocket.close()
-        except Exception:
-            pass
+    recognizer = FaceRecognizer(key=key)
+    
+    await recognizer.process_camera_stream(
+        websocket,
+        max_frames=max_frames,
+        similarity_threshold=similarity_threshold,
+        esp_clients=esp_clients
+    )
 
 # @app.websocket("/ws/cam-stream")
 # async def cam_stream(websocket: WebSocket):
@@ -228,6 +264,8 @@ async def ws_cam(websocket: WebSocket):
 #         print(f"Stream client disconnected: {e}")  
 #     finally:
 #         await websocket.close()
+
+
 
  
 if __name__ == "__main__":
