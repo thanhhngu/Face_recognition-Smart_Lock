@@ -168,7 +168,7 @@ async def ws_recognize(websocket: WebSocket, session_token: str = Cookie(None)):
     max_frames = int(cfg.get("max_frames", 30))
     similarity_threshold = int(cfg.get("similarity_threshold", 70))
 
-    await recognizer.recognize_with_websocket(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold)
+    await recognizer.recognize_with_websocket(websocket, max_frames=max_frames, similarity_threshold=similarity_threshold, esp_clients=esp_clients)
 
 @app.post("/login")
 async def login(data: LoginRequest, response: Response):

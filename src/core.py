@@ -131,17 +131,16 @@ class FaceRecognizer:
 
         return results
 
-    async def recognize_with_websocket(self, websocket: WebSocket, max_frames=21, frame_skip=3, similarity_threshold=70):
+    async def recognize_with_websocket(self, websocket: WebSocket, max_frames=21, frame_skip=3, similarity_threshold=70, esp_clients=None):
         frame_count = 0
         processed = 0
         loop = asyncio.get_running_loop()
 
         while processed < max_frames:
-        # Luôn luôn đọc frame để tránh tràn bộ đệm WebSocket
             try:
                 data = await websocket.receive_bytes()
             except Exception:
-                break # Kết thúc nếu kết nối bị ngắt
+                break
 
             frame_count += 1
 
@@ -157,7 +156,16 @@ class FaceRecognizer:
                 await websocket.send_json({"type": "detection", "results": results})
                 for r in results:
                     if r["unlock"]:
-                        # flush pending updates and send unlock decision
+                        confidence = r["similarity"]
+                        esp = esp_clients.get(self.key)
+
+                        if esp:
+                            await esp.send_text(json.dumps({
+                                "unlock": True,
+                                "name": r["name"],
+                                "confidence": round(confidence, 1)
+                            }))
+                    
                         if self.pending_updates:
                             grouped = defaultdict(list)
                             for name, vec in self.pending_updates:
@@ -169,6 +177,12 @@ class FaceRecognizer:
                         await websocket.send_json({"type": "decision", "decision": r})
                         print(f"Recognition successful for user: {r['name']}")
                         return
+                    
+        await websocket.send_json({
+            "type": "decision",
+            "decision": {"unlock": False}
+        })
+            
         await websocket.close()
         
     def _log_success_sync(self, name):
@@ -241,7 +255,6 @@ class FaceRecognizer:
                         await websocket.close()
                         return
 
-            # nếu không unlock
             if not unlocked:
                 esp = esp_clients.get(self.key)
             if esp:
@@ -260,3 +273,13 @@ class FaceRecognizer:
                 await websocket.close()
             except:
                 pass
+            
+        if self.pending_updates:
+            grouped = defaultdict(list)
+            for name, vec in self.pending_updates:
+                grouped[name].append(vec)
+            for name, vectors in grouped.items():
+                self.update_encodings(name, vectors)
+        self.pending_updates.clear()
+        
+        return
